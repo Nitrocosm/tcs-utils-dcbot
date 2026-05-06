@@ -13,12 +13,12 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.5-1'
+version = 'v5.0.6'
 
 changelog = \
 f"""
 :tada: **{version} changelog**
-- hotfix
+- trying out making apps send messages in mod chat
 """
 
 ################################################################
@@ -459,6 +459,71 @@ async def on_member_update(before, after):
         new = after.nick if after.nick else after.display_name
         await general.send(config.message('name_change', mention=after.mention, old_name=old, new_name=new))
         await general.send(f':information_source:{config.message('name_change', mention=after.mention, old_name=old, new_name=new)}', 'mod_chat')
+
+
+
+
+# ── Join Applications (undocumented gateway events) ──────────────────────────
+# by claude :wilted:
+
+async def _on_join_request_create(payload: dict):
+    """Fires when someone submits a join application (status: PENDING)."""
+    user = payload.get("user", {})
+    user_id = user.get("id")
+    username = user.get("global_name") or user.get("username", "unknown")
+    request_id = payload.get("id")
+
+    await general.send(
+        f'<:application_add:1501552015816527963> <@{user_id}> ({username}) sent a join application',
+        'mod_chat'
+    )
+
+
+async def _on_join_request_delete(payload: dict):
+    """
+    Fires when an application is rejected or withdrawn.
+    If actioned_by_user is present and isn't the applicant, it was a mod rejection.
+    Otherwise, the applicant likely withdrew themself.
+    """
+    user_id = payload.get("user_id")
+    request_id = payload.get("id")
+    actioned_by = payload.get("actioned_by_user") or {}
+    actioned_by_id = actioned_by.get("id")
+
+    if actioned_by_id and actioned_by_id != user_id:
+        await general.send(
+            f'<:application_reject:1501552028512555039> <@{actioned_by_id}> rejected <@{user_id}>\'s application\n',
+            'mod_chat'
+        )
+    else:
+        await general.send(
+            f'<:application_reject:1501552028512555039> <@{user_id}> withdrew their application\n',
+            'mod_chat'
+        )
+
+import json
+@bot.event
+async def on_socket_raw_receive(msg: str):
+    try:
+        data = json.loads(msg)
+    except (json.JSONDecodeError, TypeError):
+        return
+
+    if data.get("op") != 0:
+        return
+
+    event_type = data.get("t")
+    payload = data.get("d", {})
+
+    # ignore events from other guilds
+    guild_id = payload.get("guild_id")
+    if guild_id and int(guild_id) != TARGET_GUILD:
+        return
+
+    if event_type == "GUILD_JOIN_REQUEST_CREATE":
+        await _on_join_request_create(payload)
+    elif event_type == "GUILD_JOIN_REQUEST_DELETE":
+        await _on_join_request_delete(payload)
 
 
 @bot.event
