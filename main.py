@@ -13,7 +13,7 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-2'
+version = 'v5.0.6-3'
 
 changelog = \
 f"""
@@ -1452,34 +1452,38 @@ async def _place_custom_roles(
     reason: str,
 ) -> None:
     """
-    Rebuilds only the custom subsection under the given header.
+    Rebuild the custom subsection under `header`.
 
-    The custom subsection is the part below the empty divider and above
-    the next header.
+    This version does not assume there is a pre-existing free slot.
+    It assigns the final custom roles to the positions immediately below
+    the divider, pushing whatever needs to move.
     """
-    divider, _existing_custom = _custom_divider_and_roles(guild, header)
+    divider, existing_custom = _custom_divider_and_roles(guild, header)
     if divider is None:
         raise RuntimeError(
             f"Could not find empty divider in section `{header.name}`"
         )
 
-    _upper_exclusive, lower_exclusive = _block_bounds(guild, header)
+    # The current custom subsection already occupies these positions.
+    # We reuse those positions, and if one of the roles is new/outside the block,
+    # Discord will shift positions accordingly when applying the map.
+    current_positions_top_to_bottom = [role.position for role in existing_custom]
 
-    target_positions = list(
-        range(divider.position - 1, lower_exclusive, -1)
-    )
-
-    if len(final_custom_roles_top_to_bottom) > len(target_positions):
+    if len(final_custom_roles_top_to_bottom) != len(current_positions_top_to_bottom) + 1:
         raise RuntimeError(
-            f"Not enough slots in custom subsection under `{header.name}`"
+            "Internal mismatch while rebuilding custom subsection"
         )
 
+    # Insert the new role by using the divider-adjacent top position and then
+    # the remaining existing custom positions below it.
+    target_positions_top_to_bottom = [divider.position - 1] + current_positions_top_to_bottom
+
     position_map = {
-        role: position
-        for role, position in zip(
+        role: pos
+        for role, pos in zip(
             final_custom_roles_top_to_bottom,
-            target_positions,
-            strict=False,
+            target_positions_top_to_bottom,
+            strict=True,
         )
     }
 
@@ -1589,9 +1593,9 @@ async def create_challenge(
             reason=reason,
         )
     except discord.Forbidden:
-        errors.append("❌ could not apply colours to the badge role")
+        errors.append("❌ could not apply colors to the badge role")
     except discord.HTTPException as e:
-        errors.append(f"❌ failed to apply colours to the badge role: `{e}`")
+        errors.append(f"❌ failed to apply colors to the badge role: `{e}`")
 
     try:
         await _apply_visuals_to_role(
@@ -1600,9 +1604,9 @@ async def create_challenge(
             reason=reason,
         )
     except discord.Forbidden:
-        errors.append("❌ could not apply colours to the pingable role")
+        errors.append("❌ could not apply colors to the pingable role")
     except discord.HTTPException as e:
-        errors.append(f"❌ failed to apply colours to the pingable role: `{e}`")
+        errors.append(f"❌ failed to apply colors to the pingable role: `{e}`")
 
     # Step 3: set the display badge icon from the server emoji.
     try:
