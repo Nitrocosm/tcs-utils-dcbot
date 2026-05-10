@@ -69,6 +69,7 @@ def badge_emoji_for_name(guild: discord.Guild, name: str):
         .replace("!", "")
         .replace("?", "")
         .replace(" ", "_")
+        .replace("-", "_")
     )
     return discord.utils.get(guild.emojis, name=f"badge_{clean}")
 

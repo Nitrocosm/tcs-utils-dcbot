@@ -13,12 +13,12 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-5'
+version = 'v5.0.6-6'
 
 changelog = \
 f"""
 :tada: **{version} changelog**
-- removed leaderboard position change messages in main chat
+- fix challenge names with dashes not showing their badges properly
 """
 
 ################################################################
