@@ -13,7 +13,7 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-1'
+version = 'v5.0.6-2'
 
 changelog = \
 f"""
@@ -1487,7 +1487,7 @@ async def _place_custom_roles(
 
 
 
-@commands.command()
+@bot.command()
 @general.has_perms("owner")
 @general.try_bot_perms
 async def create_challenge(
