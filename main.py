@@ -2,7 +2,7 @@ import asyncio
 
 import discord
 from discord.ext import commands, tasks
-from modules import config, activity, moderation, general, badges
+from modules import config, activity, moderation, general, badges, role_management
 from modules.config import TARGET_GUILD
 from modules.general import timed_delete_msg, send_timed_delete_msg
 from modules.role_management import RoleSession
@@ -13,12 +13,12 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-3'
+version = 'v5.0.6-4'
 
 changelog = \
 f"""
 :tada: **{version} changelog**
-- attempt automation of creating challenge roles
+- added challenge role relations
 """
 
 ################################################################
@@ -48,13 +48,19 @@ async def on_ready():
     bot.add_view(badges.WardrobeOpenView())
     await badges.ensure_wardrobe_message(bot)
     await activity.sync_interested_reactions()
+    await role_management.load_role_relations(bot)
     msg = await general.send(f'-# :eye: building up activity cache', 'mod_chat')
     await activity.build_activity_cache()
     await msg.reply('-# :white_check_mark: done')
     if not member_checker.is_running():
         member_checker.start()
 
-
+@bot.command()
+@general.try_bot_perms
+@general.has_perms('owner')
+async def load_role_relations(ctx):
+    await role_management.load_role_relations(bot)
+    await ctx.message.add_reaction("✅")
 
 pings = True
 
