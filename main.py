@@ -13,12 +13,12 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-4'
+version = 'v5.0.6-5'
 
 changelog = \
 f"""
 :tada: **{version} changelog**
-- added challenge role relations
+- removed leaderboard position change messages in main chat
 """
 
 ################################################################
@@ -385,11 +385,11 @@ async def on_member_update(before, after):
                 await update_leaderboard_message(bot, after.guild)
                 new_rank = get_member_rank(after.guild, after)
 
-                if old_rank != new_rank and new_rank is not None:
-                    emoji = LB_EMOJI.get(new_rank, "🏆")
-                    await general.send(
-                        f"{emoji} {after.mention}'s leaderboard position is now **#{new_rank}**!"
-                    )
+                # if old_rank != new_rank and new_rank is not None:
+                #     emoji = LB_EMOJI.get(new_rank, "🏆")
+                #     await general.send(
+                #         f"{emoji} {after.mention}'s leaderboard position is now **#{new_rank}**!"
+                #     )
 
             # check completion roles
             had_all_base = after.guild.get_role(config.roles["completion_all_base"]) in after_roles
