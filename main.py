@@ -3,7 +3,7 @@ import asyncio
 import discord
 from discord import VoiceChannel
 from discord.ext import commands, tasks
-from modules import config, activity, moderation, general, badges, role_management
+from modules import config, activity, moderation, general, badges, role_management, verification
 from modules.config import TARGET_GUILD
 from modules.general import timed_delete_msg, send_timed_delete_msg
 from modules.role_management import RoleSession
@@ -51,6 +51,8 @@ async def on_ready():
     await activity.sync_interested_reactions()
     await msg.edit(content=f':radio_button: fetching role relations...')
     await role_management.load_role_relations(bot)
+    await msg.edit(content=f':radio_button: restoring verification sessions...')
+    await verification.restore_sessions(bot)
     #msg = await general.send(f'-# :eye: building up activity cache', 'mod_chat')
     await msg.edit(content=f':green_circle: restart complete!{changelog}')
     await activity.build_activity_cache()
@@ -737,10 +739,14 @@ async def on_message(message: discord.Message):
 FORUM_CHANNEL_TAG_IDS = {1443764605695557753: 1456989366076313773,
                          1465308641757364397: 1467173431605985331}
 ROLE_ID = 1466886852039671962
+
 @bot.event
 async def on_thread_create(thread: discord.Thread):
     await asyncio.sleep(1)
     if not isinstance(thread.parent, discord.ForumChannel):
+        return
+    if thread.parent_id == verification.VERIFICATION_FORUM_ID:
+        await verification.start_verification_flow(thread)
         return
     if thread.parent_id not in FORUM_CHANNEL_TAG_IDS:
         return
@@ -752,7 +758,7 @@ async def on_thread_create(thread: discord.Thread):
             current_tags.append(tag)
             await thread.edit(applied_tags=current_tags)
 
-    await thread.send(f"<@&{ROLE_ID}> new challenge to verify")
+    await thread.send(f"<:required:1463357222632292458> <@&{ROLE_ID}> new challenge to verify")
     #------------------------------------
 
 
