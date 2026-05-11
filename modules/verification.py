@@ -732,7 +732,7 @@ class VerificationView(View):
 
         is_owner = user.id == interaction.guild.owner_id
         is_op = user.id == state['op_id']
-        has_role = self._is_verifier(interaction)
+        has_role = await self._is_verifier(interaction)
         already = user.id in state.get('verified_by', [])
 
         if not is_owner and not has_role:
@@ -781,7 +781,7 @@ class VerificationView(View):
         if not isinstance(user, discord.Member):
             user = interaction.guild.get_member(user.id)
         is_owner = interaction.guild.owner_id == user.id if user else False
-        has_role = self._is_verifier(interaction)
+        has_role = await self._is_verifier(interaction)
 
         if not is_owner and not has_role:
             await interaction.response.send_message("you don't have permission to do that", ephemeral=True)
@@ -871,7 +871,7 @@ class ReportResolveView(View):
         await _set_tags(thread, [TAG_NEEDS_VERIFICATION, _verifier_tag(remaining)])
         content = _build_challenge_message(state, interaction.guild)
         view = VerificationView(remaining, hide_change=state['verifiers_done'] > 0)
-        await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping(), suppress=True)
+        await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping())
         await thread.send(f"report resolved by {interaction.user.mention} — returning to normal verification", allowed_mentions=_no_ping())
 
     @discord.ui.button(label="enter manual mode", style=discord.ButtonStyle.secondary, custom_id="v:manual:enter")
@@ -886,7 +886,7 @@ class ReportResolveView(View):
         await _set_tags(thread, [TAG_NEEDS_VERIFICATION])
         content = _build_challenge_message(state, interaction.guild)
         content += "\n\n<:required:1463357222632292458> **manual mode** — only moderators can interact with the buttons below. use them to resolve this thread."
-        await interaction.response.edit_message(content=content, view=ManualModeView(), allowed_mentions=_no_ping(), suppress=True)
+        await interaction.response.edit_message(content=content, view=ManualModeView(), allowed_mentions=_no_ping())
         await thread.send(f"manual mode activated by {interaction.user.mention}", allowed_mentions=_no_ping())
 
 
@@ -918,7 +918,7 @@ class ManualModeView(View):
         await _set_tags(thread, [TAG_NEEDS_VERIFICATION, _verifier_tag(remaining)])
         content = _build_challenge_message(state, interaction.guild)
         view = VerificationView(remaining, hide_change=state['verifiers_done'] > 0)
-        await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping(), suppress=True)
+        await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping())
         await thread.send(f"manual mode ended by {interaction.user.mention} — returning to normal verification", allowed_mentions=_no_ping())
 
     @discord.ui.button(label="mark verified (no roles)", style=discord.ButtonStyle.success, custom_id="v:manual:verify")
