@@ -1151,18 +1151,18 @@ async def update(ctx):
             timeout=30
         )
         if result.returncode != 0:
-            return await msg.edit(f':warning: git pull failed\n```{result.stderr}```')
+            return await msg.edit(content=f':warning: git pull failed\n```{result.stderr}```')
         res = result.stdout.splitlines()
         for line in res:
             res = f'{res}\n-# {line}'
-        await msg.edit(f':radio_button: pulled from git!```{res}```')
-        await msg.edit(f':radio_button: restarting bot...```{res}```')
+        await msg.edit(content=f':radio_button: pulled from git!```{res}```')
+        await msg.edit(content=f':radio_button: restarting bot...```{res}```')
         subprocess.Popen(['systemctl', 'restart', '--user', 'tcs-utils-dcbot'])
 
     except subprocess.TimeoutExpired:
-        await msg.edit(':x: git pull timed out')
+        await msg.edit(content=':x: git pull timed out')
     except Exception as e:
-        await msg.edit(f':x: error: ```{e}```')
+        await msg.edit(content=f':x: error: ```{e}```')
 
 
 @bot.command()
