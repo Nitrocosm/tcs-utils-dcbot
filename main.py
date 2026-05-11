@@ -13,12 +13,13 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-7'
+version = 'v5.0.6-8'
 
 changelog = \
 f"""
-:tada: **{version} changelog**
-- add a debug thing
+## {version} changelog
+- add message in chat for changing the voice channels' status (FINALLY!!! jesus i wanted to add this for MONTHS bro)
+- changed the way the bot works when starting up
 """
 
 ################################################################
@@ -40,18 +41,20 @@ async def member_checker_error(error: Exception):
 
 @bot.event
 async def on_ready():
-    await general.send(f':radio_button: bot connected... {version}')
+    msg = await general.send(f':radio_button: bot connected... {version}')
     await general.set_status('starting up...', status=discord.Status.idle) # type: ignore
     await bot.wait_until_ready()
-    await general.send(f':ballot_box_with_check: restart complete!')
-    await general.send(changelog)
     bot.add_view(badges.WardrobeOpenView())
+    await msg.edit(content=f':radio_button: connecting to badge wardrobe...')
     await badges.ensure_wardrobe_message(bot)
+    await msg.edit(content=f':radio_button: syncing host ping reactions...')
     await activity.sync_interested_reactions()
+    await msg.edit(content=f':radio_button: fetching role relations...')
     await role_management.load_role_relations(bot)
-    msg = await general.send(f'-# :eye: building up activity cache', 'mod_chat')
+    #msg = await general.send(f'-# :eye: building up activity cache', 'mod_chat')
+    await msg.edit(content=f':green_circle: restart complete!\n{changelog}')
     await activity.build_activity_cache()
-    await msg.reply('-# :white_check_mark: done')
+    #await msg.edit(content='-# :white_check_mark: done')
     if not member_checker.is_running():
         member_checker.start()
 
@@ -468,67 +471,67 @@ async def on_member_update(before, after):
 
 
 
-# ── Join Applications (undocumented gateway events) ──────────────────────────
-# by claude :wilted:
-
-async def _on_join_request_create(payload: dict):
-    """Fires when someone submits a join application (status: PENDING)."""
-    user = payload.get("user", {})
-    user_id = user.get("id")
-    username = user.get("global_name") or user.get("username", "unknown")
-    request_id = payload.get("id")
-
-    await general.send(
-        f'<:application_add:1501552015816527963> <@{user_id}> ({username}) sent a join application',
-        'mod_chat'
-    )
-
-
-async def _on_join_request_delete(payload: dict):
-    """
-    Fires when an application is rejected or withdrawn.
-    If actioned_by_user is present and isn't the applicant, it was a mod rejection.
-    Otherwise, the applicant likely withdrew themself.
-    """
-    user_id = payload.get("user_id")
-    request_id = payload.get("id")
-    actioned_by = payload.get("actioned_by_user") or {}
-    actioned_by_id = actioned_by.get("id")
-
-    if actioned_by_id and actioned_by_id != user_id:
-        await general.send(
-            f'<:application_reject:1501552028512555039> <@{actioned_by_id}> rejected <@{user_id}>\'s application\n',
-            'mod_chat'
-        )
-    else:
-        await general.send(
-            f'<:application_reject:1501552028512555039> <@{user_id}> withdrew their application\n',
-            'mod_chat'
-        )
-
-import json
-@bot.event
-async def on_socket_raw_receive(msg: str):
-    try:
-        data = json.loads(msg)
-    except (json.JSONDecodeError, TypeError):
-        return
-
-    if data.get("op") != 0:
-        return
-
-    event_type = data.get("t")
-    payload = data.get("d", {})
-
-    # ignore events from other guilds
-    guild_id = payload.get("guild_id")
-    if guild_id and int(guild_id) != TARGET_GUILD:
-        return
-
-    if event_type == "GUILD_JOIN_REQUEST_CREATE":
-        await _on_join_request_create(payload)
-    elif event_type == "GUILD_JOIN_REQUEST_DELETE":
-        await _on_join_request_delete(payload)
+# # ── Join Applications (undocumented gateway events) ──────────────────────────
+# # by claude :wilted:
+#
+# async def _on_join_request_create(payload: dict):
+#     """Fires when someone submits a join application (status: PENDING)."""
+#     user = payload.get("user", {})
+#     user_id = user.get("id")
+#     username = user.get("global_name") or user.get("username", "unknown")
+#     request_id = payload.get("id")
+#
+#     await general.send(
+#         f'<:application_add:1501552015816527963> <@{user_id}> ({username}) sent a join application',
+#         'mod_chat'
+#     )
+#
+#
+# async def _on_join_request_delete(payload: dict):
+#     """
+#     Fires when an application is rejected or withdrawn.
+#     If actioned_by_user is present and isn't the applicant, it was a mod rejection.
+#     Otherwise, the applicant likely withdrew themself.
+#     """
+#     user_id = payload.get("user_id")
+#     request_id = payload.get("id")
+#     actioned_by = payload.get("actioned_by_user") or {}
+#     actioned_by_id = actioned_by.get("id")
+#
+#     if actioned_by_id and actioned_by_id != user_id:
+#         await general.send(
+#             f'<:application_reject:1501552028512555039> <@{actioned_by_id}> rejected <@{user_id}>\'s application\n',
+#             'mod_chat'
+#         )
+#     else:
+#         await general.send(
+#             f'<:application_reject:1501552028512555039> <@{user_id}> withdrew their application\n',
+#             'mod_chat'
+#         )
+#
+# import json
+# @bot.event
+# async def on_socket_raw_receive(msg: str):
+#     try:
+#         data = json.loads(msg)
+#     except (json.JSONDecodeError, TypeError):
+#         return
+#
+#     if data.get("op") != 0:
+#         return
+#
+#     event_type = data.get("t")
+#     payload = data.get("d", {})
+#
+#     # ignore events from other guilds
+#     guild_id = payload.get("guild_id")
+#     if guild_id and int(guild_id) != TARGET_GUILD:
+#         return
+#
+#     if event_type == "GUILD_JOIN_REQUEST_CREATE":
+#         await _on_join_request_create(payload)
+#     elif event_type == "GUILD_JOIN_REQUEST_DELETE":
+#         await _on_join_request_delete(payload)
 
 
 @bot.event
@@ -1010,7 +1013,6 @@ async def warns(ctx, member: discord.Member = None):
 @general.has_perms('moderate_members')
 @general.can_moderate_member
 async def clear_warns(ctx, member: discord.Member = None):
-    await member.timeout(None)
     async with RoleSession(member) as rs:
         rs.remove(general.config.roles['warn_1'])
         rs.remove(general.config.roles['warn_2'])
@@ -1720,27 +1722,22 @@ async def create_challenge(
 
 
 
-send_audit_var = False
-
-@bot.command()
-@general.has_perms("owner")
-@general.try_bot_perms
-async def send_audit(ctx):
-    global send_audit_var
-    if send_audit_var:
-        await ctx.message.add_reaction("🪫")
-        send_audit_var = False
-    else:
-        await ctx.message.add_reaction("🔋")
-        send_audit_var = True
-
-
 @bot.event
 async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
-    log_channel = bot.get_channel(1503202664731906179)
-    if log_channel is None:
-        return
-    await log_channel.send(f'\ncategory: {entry.category}\n\nuser: {entry.user.mention}\naction: {entry.action}\nextra: {entry.extra}\nreason: {entry.reason}\n')
+    if entry.action.value == 192:
+        if entry.target.id == config.channels['vc']:
+            await general.send(config.message('edit_vc', member=entry.user.mention, status=entry.changes.after))
+        elif entry.target.id == config.channels['vc2']:
+            await general.send(config.message('edit_vc_2', member=entry.user.mention, status=entry.changes.after))
+        elif entry.target.id == config.channels['vc3']:
+            await general.send(config.message('edit_vc_3', member=entry.user.mention, status=entry.changes.after))
+    elif entry.action.value == 193:
+        if entry.target.id == config.channels['vc']:
+            await general.send(config.message('edit_vc_clear', member=entry.user.mention))
+        elif entry.target.id == config.channels['vc2']:
+            await general.send(config.message('edit_vc_2_clear', member=entry.user.mention))
+        elif entry.target.id == config.channels['vc3']:
+            await general.send(config.message('edit_vc_3_clear', member=entry.user.mention))
 
 
 if __name__ == '__main__':
