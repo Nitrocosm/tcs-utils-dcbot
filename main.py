@@ -13,7 +13,7 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-16'
+version = 'v5.0.6-17'
 
 changelog = \
 f"""
@@ -1735,15 +1735,16 @@ async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
         if new_status is None:
             raw = getattr(entry, '_data', None)
             if raw:
+                print(raw)
                 options = raw.get('options') or {}
                 new_status = options.get('status')
 
         if entry._target_id == config.channels['vc']:
-            await general.send(config.message('edit_vc', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none()) # <-- always says that new status is None
+            await general.send(config.message('edit_vc', member=entry.user.mention, status=(new_status if new_status else '`[failed to fetch :skull:]`')), pings=discord.AllowedMentions.none()) # <-- always says that new status is None
         elif entry._target_id == config.channels['vc2']:
-            await general.send(config.message('edit_vc_2', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
+            await general.send(config.message('edit_vc_2', member=entry.user.mention, status=(new_status if new_status else '`[failed to fetch :skull:]`')), pings=discord.AllowedMentions.none())
         elif entry._target_id == config.channels['vc3']:
-            await general.send(config.message('edit_vc_3', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
+            await general.send(config.message('edit_vc_3', member=entry.user.mention, status=(new_status if new_status else '`[failed to fetch :skull:]`')), pings=discord.AllowedMentions.none())
     elif entry.action.value == 193:
         if entry._target_id == config.channels['vc']:
             await general.send(config.message('edit_vc_clear', member=entry.user.mention), pings=discord.AllowedMentions.none())

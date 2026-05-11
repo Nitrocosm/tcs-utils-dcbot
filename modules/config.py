@@ -278,10 +278,10 @@ _messages = {
         f"{emoji['unavailable']} **{{name}}** was marked unavailable automatically (no activity in past 1.5 hrs) {{available_count}}"
     ],
     "join_vc": [
-        f"{emoji['join_vc']} **{{member}}** joined the voice channel {{count}}"
+        f"{emoji['join_vc']} **{{member}}** joined the first voice channel {{count}}"
     ],
     "leave_vc": [
-        f"{emoji['leave_vc']} **{{member}}** left the voice channel {{count}}"
+        f"{emoji['leave_vc']} **{{member}}** left the first voice channel {{count}}"
     ],
     "join_vc_2": [
         f"{emoji['join_vc_2']} **{{member}}** joined the second voice channel {{count}}"
@@ -296,8 +296,8 @@ _messages = {
         f"{emoji['leave_vc']} **{{member}}** left the third voice channel {{count}}"
     ],
 
-    "edit_vc": [f"{emoji['edit_g']} **{{member}}** set the voice channel's status to **{{status}}**"],
-    "edit_vc_clear": [f"{emoji['edit_g']} **{{member}}** cleared the voice channel's status"],
+    "edit_vc": [f"{emoji['edit_g']} **{{member}}** set the first voice channel's status to **{{status}}**"],
+    "edit_vc_clear": [f"{emoji['edit_g']} **{{member}}** cleared the first voice channel's status"],
     "edit_vc_2": [f"{emoji['edit_p']} **{{member}}** set the second voice channel's status to **{{status}}**"],
     "edit_vc_2_clear": [f"{emoji['edit_p']} **{{member}}** cleared the second voice channel's status"],
     "edit_vc_3": [f"{emoji['edit_r']} **{{member}}** set the third voice channel's status to **{{status}}**"],
