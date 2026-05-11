@@ -13,7 +13,7 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-17'
+version = 'v5.0.6-debug'
 
 changelog = \
 f"""
@@ -1154,7 +1154,7 @@ async def update(ctx):
         res = result.stdout.splitlines()
         for line in res:
             res = f'{res}\n-# {line}'
-        await ctx.send(content=f':radio_button: pulled from git!\n{res}')
+        await ctx.send(content=f':radio_button: pulled from git!\n-# {res}')
         await ctx.send(content=f':radio_button: restarting bot...')
         subprocess.Popen(['systemctl', 'restart', '--user', 'tcs-utils-dcbot'])
 
@@ -1728,19 +1728,36 @@ async def create_challenge(
 async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
     if entry.action.value == 192:
         new_status = None
-        try:
-            new_status = entry.changes.after.status
-        except AttributeError:
-            pass
-        if new_status is None:
-            raw = getattr(entry, '_data', None)
-            if raw:
-                print(raw)
-                options = raw.get('options') or {}
-                new_status = options.get('status')
+        # try:
+        #     new_status = entry.changes.after.status
+        # except AttributeError:
+        #     pass
+        # if new_status is None:
+        #     raw = getattr(entry, '_data', None) # <-- always None
+        #     if raw:
+        #         print(raw)
+        #         options = raw.get('options') or {}
+        #         new_status = options.get('status')
+
+        test_channel = bot.get_channel(1503202664731906179)
+        test_channel.send(
+            f"action: {entry.action}\n"
+            f"target: {entry.target}\n"
+            f"user: {entry.user}\n"
+            f"id: {entry.id}\n"
+            f"guild: {entry.guild}\n"
+            f"extra: {entry.extra} / {entry.extra!r} / type: {type(entry.extra)}\n"
+            f"after: {entry.after}\n"
+            f"before: {entry.before}\n"
+            f"category: {entry.category}\n"
+            f"changes: {entry.changes}\n"
+            f"created_at: {entry.created_at}\n"
+            f"reason: {entry.reason}\n"
+            f"user_id: {entry.user_id}"
+        )
 
         if entry._target_id == config.channels['vc']:
-            await general.send(config.message('edit_vc', member=entry.user.mention, status=(new_status if new_status else '`[failed to fetch :skull:]`')), pings=discord.AllowedMentions.none()) # <-- always says that new status is None
+            await general.send(config.message('edit_vc', member=entry.user.mention, status=(new_status if new_status else '`[failed to fetch :skull:]`')), pings=discord.AllowedMentions.none()) # <-- always says that new status failed to fetch
         elif entry._target_id == config.channels['vc2']:
             await general.send(config.message('edit_vc_2', member=entry.user.mention, status=(new_status if new_status else '`[failed to fetch :skull:]`')), pings=discord.AllowedMentions.none())
         elif entry._target_id == config.channels['vc3']:
