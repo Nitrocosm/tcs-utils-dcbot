@@ -1152,9 +1152,10 @@ async def update(ctx):
         if result.returncode != 0:
             return await ctx.send(content=f':warning: git pull failed\n```{result.stderr}```')
         res = result.stdout.splitlines()
+        text = ''
         for line in res:
-            res = f'{res}\n-# {line}'
-        await ctx.send(content=f':radio_button: pulled from git!\n-# {res}')
+            text = f'{text}\n-# {line}'
+        await ctx.send(content=f':radio_button: pulled from git!\n-# {text}')
         await ctx.send(content=f':radio_button: restarting bot...')
         subprocess.Popen(['systemctl', 'restart', '--user', 'tcs-utils-dcbot'])
 
@@ -1724,38 +1725,29 @@ async def create_challenge(
 
 
 
+_pending_vc_status: dict[int, str | None] = {}
+import json
+@bot.event
+async def on_socket_raw_receive(msg):
+    try:
+        data = json.loads(msg)
+    except (json.JSONDecodeError, TypeError):
+        return
+
+    if data.get("t") != "GUILD_AUDIT_LOG_ENTRY_CREATE":
+        return
+
+    d = data.get("d", {})
+    if d.get("action_type") == 192:
+        options = d.get("options") or {}
+        entry_id = int(d["id"])
+        _pending_vc_status[entry_id] = options.get("status")
+
+
 @bot.event
 async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
     if entry.action.value == 192:
-        new_status = None
-        # try:
-        #     new_status = entry.changes.after.status
-        # except AttributeError:
-        #     pass
-        # if new_status is None:
-        #     raw = getattr(entry, '_data', None) # <-- always None
-        #     if raw:
-        #         print(raw)
-        #         options = raw.get('options') or {}
-        #         new_status = options.get('status')
-
-        test_channel = bot.get_channel(1503202664731906179)
-        await test_channel.send(
-            f"action: {entry.action}\n"
-            f"target: {entry.target}\n"
-            f"user: {entry.user}\n"
-            f"id: {entry.id}\n"
-            f"guild: {entry.guild}\n"
-            f"extra: {entry.extra} / {entry.extra!r} / type: {type(entry.extra)}\n"
-            f"after: {entry.after}\n"
-            f"before: {entry.before}\n"
-            f"category: {entry.category}\n"
-            f"changes: {entry.changes}\n"
-            f"created_at: {entry.created_at}\n"
-            f"reason: {entry.reason}\n"
-            f"user_id: {entry.user_id}"
-        )
-
+        new_status = _pending_vc_status.pop(entry.id, None)
         if entry._target_id == config.channels['vc']:
             await general.send(config.message('edit_vc', member=entry.user.mention, status=(new_status if new_status else '`[failed to fetch :skull:]`')), pings=discord.AllowedMentions.none()) # <-- always says that new status failed to fetch
         elif entry._target_id == config.channels['vc2']:
