@@ -13,7 +13,7 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-14'
+version = 'v5.0.6-15'
 
 changelog = \
 f"""
@@ -1727,6 +1727,8 @@ async def create_challenge(
 @bot.event
 async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
     if entry.action.value == 192:
+        import json
+        print(json.dumps(entry._data, indent=4))
         raw_changes = getattr(entry, "_changes", [])
         new_status = None
         #old_status = None
