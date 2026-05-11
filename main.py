@@ -1740,7 +1740,7 @@ async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
         #         new_status = options.get('status')
 
         test_channel = bot.get_channel(1503202664731906179)
-        test_channel.send(
+        await test_channel.send(
             f"action: {entry.action}\n"
             f"target: {entry.target}\n"
             f"user: {entry.user}\n"
