@@ -1155,7 +1155,7 @@ async def update(ctx):
         text = ''
         for line in res:
             text = f'{text}\n-# {line}'
-        await ctx.send(content=f':radio_button: pulled from git!\n-# {text}')
+        await ctx.send(content=f':radio_button: pulled from git!{text}')
         await ctx.send(content=f':radio_button: restarting bot...')
         subprocess.Popen(['systemctl', 'restart', '--user', 'tcs-utils-dcbot'])
 
@@ -1726,7 +1726,9 @@ async def create_challenge(
 
 @bot.event
 async def on_raw_audit_log_entry_create(payload):
+    print('audit log entry create fired')
     if payload.action_type == 192:
+        print('it is action 192')
         # payload.extra is a dict containing 'options' for raw events
         options = getattr(payload, 'extra', {}) or {}
         new_status = options.get('status')
