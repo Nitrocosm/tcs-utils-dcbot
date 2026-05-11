@@ -12,6 +12,7 @@ from modules import config
 from modules.bot_init import bot
 from modules.points import parse_challenge_role
 from modules.role_management import RoleSession
+from modules.badges import badge_emoji_for_name as _badge_emoji
 
 VERIFICATION_FORUM_ID = 1502768684085678200
 STATE_FILE = 'verification_state.json'
@@ -69,6 +70,7 @@ def _init_state(thread_id: int, op_id: int) -> dict:
         'video_url': None,
         'verifiers_needed': 0,
         'verifiers_done': 0,
+        'verified_by': [],
         'report_resolved': False,
         'ignore': False,
     }
@@ -84,6 +86,34 @@ def _clean_state(thread_id: int):
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
+def _select_emoji_for_challenge(guild: discord.Guild, name: str, points: int) -> Optional[discord.PartialEmoji]:
+    emoji = _badge_emoji(guild, name)
+    if emoji:
+        return emoji
+    diff = 0
+    if points <= 0:   diff = 0
+    elif points <= 2: diff = 1
+    elif points <= 4: diff = 2
+    elif points <= 7: diff = 3
+    elif points <= 10: diff = 4
+    elif points <= 13: diff = 5
+    elif points <= 17: diff = 6
+    elif points <= 23: diff = 7
+    else: diff = 8
+    placeholders = [
+        "<:badge_placeholder_custom_npc:1468336218407436328>",
+        "<:badge_placeholder_custom_normal:1468336216171614490>",
+        "<:badge_placeholder_custom_hard:1468336226154184867>",
+        "<:badge_placeholder_custom_insane:1468336205635784988>",
+        "<:badge_placeholder_custom_extreme:1468336223444537414>",
+        "<:badge_placeholder_custom_brutal:1468336220609314877>",
+        "<:badge_placeholder_custom_maso:1468336214124925073>",
+        "<:badge_placeholder_custom_leg:1468336228914172119>",
+        "<:badge_placeholder_custom_godlike:1468518569619886111>",
+    ]
+    m = re.match(r"<:(\w+):(\d+)>", placeholders[diff])
+    return discord.PartialEmoji(name=m.group(1), id=int(m.group(2))) if m else None
+
 def _get_challenge_roles(guild: discord.Guild):
     official, custom, joke = [], [], []
     for role in guild.roles:
@@ -91,6 +121,8 @@ def _get_challenge_roles(guild: discord.Guild):
         if not info:
             continue
         if info['points'] == 0:
+            if 'Legacy' in info['name']:
+                continue
             joke.append(role)
         elif role.name.startswith('\U0001f3c6'):
             official.append(role)
@@ -167,6 +199,28 @@ def _build_challenge_message(state: dict, guild: discord.Guild) -> str:
         lines.append("there is no video yet")
     return "\n".join(lines)
 
+def _no_ping():
+    return discord.AllowedMentions.none()
+
+# ── Verification logic ──────────────────────────────────────────────────────
+
+_NONCE_SEPARATOR = "::vnonce::"
+
+async def _do_verify(thread: discord.Thread, state: dict, user_id: int, mention: str, bot_msg: discord.Message):
+    if user_id not in state['verified_by']:
+        state['verified_by'].append(user_id)
+    state['verifiers_done'] += 1
+    remaining = state['verifiers_needed'] - state['verifiers_done']
+    if remaining <= 0:
+        await thread.send(f"{mention} marked this as verified - 0 more needed", allowed_mentions=_no_ping())
+        await _complete_verification(thread, state, bot_msg)
+        return
+    _save_state()
+    await thread.send(f"{mention} marked this as verified - {remaining} more needed", allowed_mentions=_no_ping())
+    await _set_tags(thread, [TAG_NEEDS_VERIFICATION, _verifier_tag(remaining)])
+    content = _build_challenge_message(state, thread.guild)
+    await bot_msg.edit(content=content, view=VerificationView(remaining))
+
 # ── Flow functions ──────────────────────────────────────────────────────────
 
 async def start_verification_flow(thread: discord.Thread):
@@ -198,7 +252,7 @@ async def _ask_for_video(thread: discord.Thread, state: dict, bot_msg: discord.M
     content = _build_challenge_message(state, thread.guild)
     content += f"\n\n<@{op_id}> please either edit your original post to add a youtube link, or send it here"
     view = NoFootageView()
-    await bot_msg.edit(content=content, view=view)
+    await bot_msg.edit(content=content, view=view, allowed_mentions=_no_ping())
     state['state'] = 'awaiting_video'
     _save_state()
 
@@ -213,7 +267,7 @@ async def _process_video(video_id: str, thread: discord.Thread, state: dict, bot
         _save_state()
         await _set_tags(thread, [TAG_UPLOADING])
         content = _build_challenge_message(state, thread.guild)
-        await bot_msg.edit(content=content)
+        await bot_msg.edit(content=content, allowed_mentions=_no_ping())
         if not video_polling_loop.is_running():
             video_polling_loop.start()
     else:
@@ -221,7 +275,7 @@ async def _process_video(video_id: str, thread: discord.Thread, state: dict, bot
         content = _build_challenge_message(state, thread.guild)
         content += f"\n\n<@{op_id}> that video is private or doesn't exist. please provide a different link, or wait until it's available"
         view = NoFootageView()
-        await bot_msg.edit(content=content, view=view)
+        await bot_msg.edit(content=content, view=view, allowed_mentions=_no_ping())
 
 async def _enter_verification_phase(thread: discord.Thread, state: dict, bot_msg: discord.Message):
     needed = state['verifiers_needed']
@@ -231,7 +285,7 @@ async def _enter_verification_phase(thread: discord.Thread, state: dict, bot_msg
     await _set_tags(thread, tag_ids)
     content = _build_challenge_message(state, thread.guild)
     view = VerificationView(needed)
-    await bot_msg.edit(content=content, view=view)
+    await bot_msg.edit(content=content, view=view, allowed_mentions=_no_ping())
     await thread.send(f"<@&{VERIFIER_ROLE_ID}> new challenge to verify")
 
 async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: discord.Message = None):
@@ -244,10 +298,10 @@ async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: d
     if member and role_id:
         async with RoleSession(member) as rs:
             rs.add(role_id)
-    await thread.send("this run has been verified! :white_check_mark:")
+    await thread.send("this run has been verified! :white_check_mark:", allowed_mentions=_no_ping())
     if bot_msg:
         try:
-            await bot_msg.edit(content="this run has been verified! :white_check_mark:", view=None)
+            await bot_msg.edit(content="this run has been verified! :white_check_mark:", view=None, allowed_mentions=_no_ping())
         except:
             pass
     await thread.edit(archived=True, locked=True)
@@ -327,14 +381,14 @@ class ChallengeCategoryView(View):
         _save_state()
         official, custom, joke = _get_challenge_roles(interaction.guild)
         roles = {'official': official, 'custom': custom, 'joke': joke}[category]
-        view = ChallengeMenuView(category, roles, 0)
+        view = ChallengeMenuView(category, roles, 0, interaction.guild)
         await interaction.response.edit_message(content="pick a challenge:", view=view)
 
-    @discord.ui.button(label="official challenge", style=discord.ButtonStyle.primary, custom_id="v:cat:off")
+    @discord.ui.button(label="official challenge", style=discord.ButtonStyle.secondary, custom_id="v:cat:off")
     async def official_btn(self, interaction: discord.Interaction, button: Button):
         await self._handle_category(interaction, 'official')
 
-    @discord.ui.button(label="custom challenge", style=discord.ButtonStyle.success, custom_id="v:cat:cust")
+    @discord.ui.button(label="custom challenge", style=discord.ButtonStyle.secondary, custom_id="v:cat:cust")
     async def custom_btn(self, interaction: discord.Interaction, button: Button):
         await self._handle_category(interaction, 'custom')
 
@@ -355,6 +409,7 @@ class ChallengeCategoryView(View):
         await interaction.response.edit_message(
             content="ok, i'll ignore this thread then - if you wish to make this thread a verification request again - click the button below",
             view=view,
+            allowed_mentions=_no_ping(),
         )
 
 
@@ -379,17 +434,18 @@ class ReopenView(View):
 
 
 class ChallengeMenuView(View):
-    def __init__(self, category: str, roles: list[discord.Role], page: int = 0, per_page: int = 25):
+    def __init__(self, category: str, roles: list[discord.Role], page: int = 0, guild: discord.Guild = None, per_page: int = 25):
         super().__init__(timeout=None)
         self.category = category
         self.roles = roles
         self.page = page
         self.per_page = per_page
+        self.guild = guild
 
         for cat, label, cid in [
-            ('official', 'Official', 'v:tab:off'),
-            ('custom', 'Custom', 'v:tab:cust'),
-            ('joke', 'Joke Badges', 'v:tab:joke'),
+            ('official', 'official challenge', 'v:tab:off'),
+            ('custom', 'custom challenge', 'v:tab:cust'),
+            ('joke', 'joke badge', 'v:tab:joke'),
         ]:
             disabled = (cat == category)
             btn = Button(label=label, style=discord.ButtonStyle.secondary, disabled=disabled, custom_id=cid, row=0)
@@ -404,8 +460,8 @@ class ChallengeMenuView(View):
             if not info:
                 continue
             label = (info['name'][:97] + '...') if len(info['name']) > 100 else info['name']
-            desc = f"{info['points']} pts" if info['points'] > 0 else "joke badge"
-            options.append(discord.SelectOption(label=label, value=str(role.id), description=desc))
+            emoji = _select_emoji_for_challenge(guild, info['name'], info['points']) if guild else None
+            options.append(discord.SelectOption(label=label, value=str(role.id), emoji=emoji))
         if not options:
             options.append(discord.SelectOption(label="no challenges available", value="none"))
         select = Select(placeholder="choose a challenge...", options=options, custom_id="v:menu")
@@ -432,7 +488,7 @@ class ChallengeMenuView(View):
             state['selected_category'] = category
             state['menu_page'] = 0
             _save_state()
-            await interaction.response.edit_message(content="pick a challenge:", view=ChallengeMenuView(category, roles, 0))
+            await interaction.response.edit_message(content="pick a challenge:", view=ChallengeMenuView(category, roles, 0, interaction.guild))
         return cb
 
     def _make_page_cb(self, delta: int):
@@ -447,7 +503,7 @@ class ChallengeMenuView(View):
             new_page = state['menu_page'] + delta
             state['menu_page'] = new_page
             _save_state()
-            await interaction.response.edit_message(content="pick a challenge:", view=ChallengeMenuView(cat, roles, new_page))
+            await interaction.response.edit_message(content="pick a challenge:", view=ChallengeMenuView(cat, roles, new_page, interaction.guild))
         return cb
 
     async def _on_select(self, interaction: discord.Interaction):
@@ -475,7 +531,7 @@ class ChallengeMenuView(View):
         _save_state()
         content = _build_challenge_message(state, interaction.guild)
         view = ChallengeConfirmView()
-        await interaction.response.edit_message(content=content, view=view)
+        await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping())
         thread = interaction.channel
         if isinstance(thread, discord.Thread):
             try:
@@ -515,7 +571,7 @@ class ChallengeConfirmView(View):
         roles = {'official': official, 'custom': custom, 'joke': joke}[cat]
         state['state'] = 'choose_challenge'
         _save_state()
-        view = ChallengeMenuView(cat, roles, 0)
+        view = ChallengeMenuView(cat, roles, 0, interaction.guild)
         await interaction.response.edit_message(content="pick a challenge:", view=view)
 
 
@@ -532,6 +588,30 @@ class NoFootageView(View):
         state['state'] = 'needs_verification'
         _save_state()
         await _enter_verification_phase(interaction.channel, state, interaction.message)
+
+
+class OwnerVerifyPromptView(View):
+    def __init__(self, is_redo: bool):
+        super().__init__()
+        self.is_redo = is_redo
+
+    @discord.ui.button(label="yes, verify anyway", style=discord.ButtonStyle.primary)
+    async def confirm(self, interaction: discord.Interaction, button: Button):
+        state = _get_state(interaction.channel_id)
+        thread = interaction.channel
+        user_id = interaction.user.id
+        mention = interaction.user.mention
+        try:
+            bot_msg = await thread.fetch_message(state['message_id'])
+        except:
+            await interaction.response.edit_message(content="could not find the verification message", view=None)
+            return
+        await interaction.response.edit_message(content="proceeding...", view=None)
+        await _do_verify(thread, state, user_id, mention, bot_msg)
+
+    @discord.ui.button(label="cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.edit_message(content="verification cancelled", view=None)
 
 
 class VerificationView(View):
@@ -559,32 +639,56 @@ class VerificationView(View):
         vr = interaction.guild.get_role(VERIFIER_ROLE_ID)
         return bool(vr and vr in member.roles)
 
-    async def _is_op(self, interaction: discord.Interaction) -> bool:
-        state = _get_state(interaction.channel_id)
-        return interaction.user.id == state['op_id']
-
     async def _on_verify(self, interaction: discord.Interaction):
-        if not await self._is_verifier(interaction):
+        state = _get_state(interaction.channel_id)
+        user = interaction.user
+        if not isinstance(user, discord.Member):
+            user = interaction.guild.get_member(user.id)
+        if not user:
+            await interaction.response.send_message("could not verify identity", ephemeral=True)
+            return
+
+        is_owner = user.id == interaction.guild.owner_id
+        has_role = self._is_verifier(interaction)
+        already = user.id in state.get('verified_by', [])
+
+        if not is_owner and not has_role:
             await interaction.response.send_message("you don't have permission to do that", ephemeral=True)
             return
-        await interaction.response.defer()
-        state = _get_state(interaction.channel_id)
-        state['verifiers_done'] += 1
-        remaining = state['verifiers_needed'] - state['verifiers_done']
-        if remaining <= 0:
-            await _complete_verification(interaction.channel, state, interaction.message)
-            await interaction.edit_original_response(content="this run has been verified! :white_check_mark:", view=None)
+
+        if already:
+            if is_owner:
+                prompt = OwnerVerifyPromptView(is_redo=True)
+                await interaction.response.send_message("you already verified this. are you sure you want to do it again?", view=prompt, ephemeral=True)
+            else:
+                await interaction.response.send_message("you already verified this", ephemeral=True)
             return
-        _save_state()
-        await interaction.channel.send(f"{interaction.user.mention} marked this as verified - {remaining} more needed")
-        await _set_tags(interaction.channel, [TAG_NEEDS_VERIFICATION, _verifier_tag(remaining)])
-        content = _build_challenge_message(state, interaction.guild)
-        await interaction.edit_original_response(content=content, view=VerificationView(remaining))
+
+        if is_owner and not has_role:
+            prompt = OwnerVerifyPromptView(is_redo=False)
+            await interaction.response.send_message("are you sure you want to verify this run?", view=prompt, ephemeral=True)
+            return
+
+        thread = interaction.channel
+        try:
+            bot_msg = await thread.fetch_message(state['message_id'])
+        except:
+            await interaction.response.send_message("could not find the verification message", ephemeral=True)
+            return
+
+        await _do_verify(thread, state, user.id, user.mention, bot_msg)
 
     async def _on_report(self, interaction: discord.Interaction):
-        if not await self._is_verifier(interaction):
+        user = interaction.user
+        if not isinstance(user, discord.Member):
+            user = interaction.guild.get_member(user.id)
+        is_owner = interaction.guild.owner_id == user.id if user else False
+        has_role = self._is_verifier(interaction)
+
+        if not is_owner and not has_role:
             await interaction.response.send_message("you don't have permission to do that", ephemeral=True)
             return
+
         await interaction.response.send_message(
             "are you sure you want to report this verification?",
             view=ReportConfirmView(),
@@ -596,13 +700,12 @@ class VerificationView(View):
         if interaction.user.id != state['op_id']:
             await interaction.response.send_message("this isn't for you", ephemeral=True)
             return
-        state = _get_state(interaction.channel_id)
         official, custom, joke = _get_challenge_roles(interaction.guild)
         cat = state.get('selected_category', 'official')
         roles = {'official': official, 'custom': custom, 'joke': joke}[cat]
         state['state'] = 'choose_challenge'
         _save_state()
-        view = ChallengeMenuView(cat, roles, 0)
+        view = ChallengeMenuView(cat, roles, 0, interaction.guild)
         await interaction.response.edit_message(content="pick a challenge:", view=view)
 
 
@@ -641,8 +744,9 @@ class ReportResolveView(View):
             member = interaction.guild.get_member(member.id)
         mod_role = interaction.guild.get_role(MOD_ROLE_ID)
         if not mod_role or not member or mod_role not in member.roles:
-            await interaction.response.send_message("you don't have permission to do that", ephemeral=True)
-            return
+            if member and member.id != interaction.guild.owner_id:
+                await interaction.response.send_message("you don't have permission to do that", ephemeral=True)
+                return
         state = _get_state(interaction.channel_id)
         state['state'] = 'verification'
         state['report_resolved'] = True
@@ -652,8 +756,8 @@ class ReportResolveView(View):
         await _set_tags(thread, [TAG_NEEDS_VERIFICATION, _verifier_tag(remaining)])
         content = _build_challenge_message(state, interaction.guild)
         view = VerificationView(remaining)
-        await interaction.response.edit_message(content=content, view=view)
-        await thread.send(f"report resolved by {interaction.user.mention}")
+        await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping())
+        await thread.send(f"report resolved by {interaction.user.mention}", allowed_mentions=_no_ping())
 
 
 # ── Polling ─────────────────────────────────────────────────────────────────
@@ -704,6 +808,7 @@ async def restore_sessions(client: discord.Client):
     guild = client.get_guild(config.TARGET_GUILD)
     if not guild:
         return
+
     for key, s in list(_state.items()):
         if s.get('state') in ('verified',):
             _state.pop(key, None)
@@ -716,18 +821,16 @@ async def restore_sessions(client: discord.Client):
             try:
                 thread = await guild.fetch_channel(s['thread_id'])
             except:
-                _state.pop(key, None)
-                _save_state()
-                continue
+                pass
             if not isinstance(thread, discord.Thread):
                 _state.pop(key, None)
                 _save_state()
                 continue
+
     if any(s.get('state') == 'awaiting_upload' for s in _state.values()):
         if not video_polling_loop.is_running():
             video_polling_loop.start()
 
-    # Immediate check for awaiting_upload threads on restart
     for s in list(_state.values()):
         if s.get('state') != 'awaiting_upload':
             continue
