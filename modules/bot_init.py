@@ -9,4 +9,4 @@ _intents.guilds = True
 _intents.message_content = True
 
 
-bot = commands.Bot(command_prefix='.', intents=_intents, help_command=None)
+bot = commands.Bot(command_prefix='.', intents=_intents, enable_debug_events=True, help_command=None)

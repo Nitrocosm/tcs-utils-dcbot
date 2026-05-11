@@ -259,42 +259,28 @@ _messages = {
     ],
     "spoiler_add": [f"{emoji['join']} {{mention}} joined the spoilers channel"],
     "spoiler_remove": [f"{emoji['kick']} {{mention}} is no longer in the spoilers channel"],
-    "available": [
-        f"{emoji['available']} **{{name}}** is now available {{available_count}}"
-    ],
-    "available_ping": [
-        f"{emoji['available']} **{{name}}** is now available {{available_count}} *<@&{roles['available']}>*"
-    ],
-    "unavailable": [
-        f"{emoji['unavailable']} **{{name}}** is no longer available {{available_count}}"
-    ],
-    "unavailable_ping": [
-        f"{emoji['unavailable']} **{{name}}** is no longer available {{available_count}} *(we still have 8 tho)*"
-    ],
-    "unavailable_auto": [
-        f"{emoji['unavailable']} **{{name}}** was marked unavailable by mods {{available_count}}"
-    ],
-    "unavailable_auto_bot": [
-        f"{emoji['unavailable']} **{{name}}** was marked unavailable automatically (no activity in past 1.5 hrs) {{available_count}}"
-    ],
-    "join_vc": [
-        f"{emoji['join_vc']} **{{member}}** joined the first voice channel {{count}}"
-    ],
-    "leave_vc": [
-        f"{emoji['leave_vc']} **{{member}}** left the first voice channel {{count}}"
-    ],
-    "join_vc_2": [
-        f"{emoji['join_vc_2']} **{{member}}** joined the second voice channel {{count}}"
-    ],
-    "leave_vc_2": [
-        f"{emoji['leave_vc']} **{{member}}** left the second voice channel {{count}}"
-    ],
-    "join_vc_3": [
-        f"{emoji['join_vc_3']} **{{member}}** joined the third voice channel {{count}}"
-    ],
-    "leave_vc_3": [
-        f"{emoji['leave_vc']} **{{member}}** left the third voice channel {{count}}"
-    ],
+
+    "available": [f"{emoji['available']} **{{name}}** is now available {{available_count}}"],
+    "available_ping": [f"{emoji['available']} **{{name}}** is now available {{available_count}} *<@&{roles['available']}>*"],
+
+    "unavailable": [f"{emoji['unavailable']} **{{name}}** is no longer available {{available_count}}"],
+    "unavailable_ping": [f"{emoji['unavailable']} **{{name}}** is no longer available {{available_count}} *(we still have 8 tho)*"],
+    "unavailable_auto": [f"{emoji['unavailable']} **{{name}}** was marked unavailable by mods {{available_count}}"],
+    "unavailable_auto_bot": [f"{emoji['unavailable']} **{{name}}** was marked unavailable automatically (no activity in past 1.5 hrs) {{available_count}}"],
+
+    "join_vc": [f"{emoji['join_vc']} **{{member}}** joined the first voice channel {{count}}"],
+    "leave_vc": [f"{emoji['leave_vc']} **{{member}}** left the first voice channel {{count}}"],
+    "join_vc_2": [f"{emoji['join_vc_2']} **{{member}}** joined the second voice channel {{count}}"],
+    "leave_vc_2": [f"{emoji['leave_vc']} **{{member}}** left the second voice channel {{count}}"],
+    "join_vc_3": [f"{emoji['join_vc_3']} **{{member}}** joined the third voice channel {{count}}"],
+    "leave_vc_3": [f"{emoji['leave_vc']} **{{member}}** left the third voice channel {{count}}"],
+
+    "join_vc_force": [f"{emoji['join_vc']} fixed **{{member}}**'s vc roles: joined the first voice channel {{count}}"],
+    "leave_vc_force": [f"{emoji['leave_vc']} fixed **{{member}}**'s vc roles: left the first voice channel {{count}}"],
+    "join_vc_2_force": [f"{emoji['join_vc_2']} fixed **{{member}}**'s vc roles: joined the second voice channel {{count}}"],
+    "leave_vc_2_force": [f"{emoji['leave_vc']} fixed **{{member}}**'s vc roles: left the second voice channel {{count}}"],
+    "join_vc_3_force": [f"{emoji['join_vc_3']} fixed **{{member}}**'s vc roles: joined the third voice channel {{count}}"],
+    "leave_vc_3_force": [f"{emoji['leave_vc']} fixed **{{member}}**'s vc roles: left the third voice channel {{count}}"],
 
     "edit_vc": [f"{emoji['edit_g']} **{{member}}** set the first voice channel's status to **{{status}}**"],
     "edit_vc_no_status": [f"{emoji['edit_g']} **{{member}}** set the first voice channel's status"],

@@ -1,6 +1,7 @@
 import asyncio
 
 import discord
+from discord import VoiceChannel
 from discord.ext import commands, tasks
 from modules import config, activity, moderation, general, badges, role_management
 from modules.config import TARGET_GUILD
@@ -470,67 +471,67 @@ async def on_member_update(before, after):
 
 
 
-# # ── Join Applications (undocumented gateway events) ──────────────────────────
-# # by claude :wilted:
-#
-# async def _on_join_request_create(payload: dict):
-#     """Fires when someone submits a join application (status: PENDING)."""
-#     user = payload.get("user", {})
-#     user_id = user.get("id")
-#     username = user.get("global_name") or user.get("username", "unknown")
-#     request_id = payload.get("id")
-#
-#     await general.send(
-#         f'<:application_add:1501552015816527963> <@{user_id}> ({username}) sent a join application',
-#         'mod_chat'
-#     )
-#
-#
-# async def _on_join_request_delete(payload: dict):
-#     """
-#     Fires when an application is rejected or withdrawn.
-#     If actioned_by_user is present and isn't the applicant, it was a mod rejection.
-#     Otherwise, the applicant likely withdrew themself.
-#     """
-#     user_id = payload.get("user_id")
-#     request_id = payload.get("id")
-#     actioned_by = payload.get("actioned_by_user") or {}
-#     actioned_by_id = actioned_by.get("id")
-#
-#     if actioned_by_id and actioned_by_id != user_id:
-#         await general.send(
-#             f'<:application_reject:1501552028512555039> <@{actioned_by_id}> rejected <@{user_id}>\'s application\n',
-#             'mod_chat'
-#         )
-#     else:
-#         await general.send(
-#             f'<:application_reject:1501552028512555039> <@{user_id}> withdrew their application\n',
-#             'mod_chat'
-#         )
-#
-# import json
-# @bot.event
-# async def on_socket_raw_receive(msg: str):
-#     try:
-#         data = json.loads(msg)
-#     except (json.JSONDecodeError, TypeError):
-#         return
-#
-#     if data.get("op") != 0:
-#         return
-#
-#     event_type = data.get("t")
-#     payload = data.get("d", {})
-#
-#     # ignore events from other guilds
-#     guild_id = payload.get("guild_id")
-#     if guild_id and int(guild_id) != TARGET_GUILD:
-#         return
-#
-#     if event_type == "GUILD_JOIN_REQUEST_CREATE":
-#         await _on_join_request_create(payload)
-#     elif event_type == "GUILD_JOIN_REQUEST_DELETE":
-#         await _on_join_request_delete(payload)
+# ── Join Applications (undocumented gateway events) ──────────────────────────
+# by claude :wilted:
+
+async def _on_join_request_create(payload: dict):
+    """Fires when someone submits a join application (status: PENDING)."""
+    user = payload.get("user", {})
+    user_id = user.get("id")
+    username = user.get("global_name") or user.get("username", "unknown")
+    request_id = payload.get("id")
+
+    await general.send(
+        f'<:application_add:1501552015816527963> <@{user_id}> ({username}) sent a join application',
+        'mod_chat'
+    )
+
+
+async def _on_join_request_delete(payload: dict):
+    """
+    Fires when an application is rejected or withdrawn.
+    If actioned_by_user is present and isn't the applicant, it was a mod rejection.
+    Otherwise, the applicant likely withdrew themself.
+    """
+    user_id = payload.get("user_id")
+    request_id = payload.get("id")
+    actioned_by = payload.get("actioned_by_user") or {}
+    actioned_by_id = actioned_by.get("id")
+
+    if actioned_by_id and actioned_by_id != user_id:
+        await general.send(
+            f'<:application_reject:1501552028512555039> <@{actioned_by_id}> rejected <@{user_id}>\'s application\n',
+            'mod_chat'
+        )
+    else:
+        await general.send(
+            f'<:application_reject:1501552028512555039> <@{user_id}> withdrew their application\n',
+            'mod_chat'
+        )
+
+import json
+@bot.event
+async def on_socket_raw_receive(msg: str):
+    try:
+        data = json.loads(msg)
+    except (json.JSONDecodeError, TypeError):
+        return
+
+    if data.get("op") != 0:
+        return
+
+    event_type = data.get("t")
+    payload = data.get("d", {})
+
+    # ignore events from other guilds
+    guild_id = payload.get("guild_id")
+    if guild_id and int(guild_id) != TARGET_GUILD:
+        return
+
+    if event_type == "GUILD_JOIN_REQUEST_CREATE":
+        await _on_join_request_create(payload)
+    elif event_type == "GUILD_JOIN_REQUEST_DELETE":
+        await _on_join_request_delete(payload)
 
 
 @bot.event
@@ -747,6 +748,8 @@ async def on_thread_create(thread: discord.Thread):
             await thread.edit(applied_tags=current_tags)
 
     await thread.send(f"<@&{ROLE_ID}> new challenge to verify")
+    #------------------------------------
+
 
 
 
@@ -1724,45 +1727,26 @@ async def create_challenge(
     )
 
 
-import json
-
-_pending_vc_status: dict[int, str | None] = {}
-
-
-@bot.event
-async def on_socket_raw_receive(msg):
-    try:
-        data = json.loads(msg)
-    except Exception:
-        print('on socket raw receive exception')
-        return
-
-    t = data.get("t")
-    d = data.get("d")
-
-    if t == "GUILD_AUDIT_LOG_ENTRY_CREATE":
-        print("RAW AUDIT EVENT:")
-        print(data)
-
-
 @bot.event
 async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
     if entry.action.value == 192:
-        new_status = _pending_vc_status.pop(entry.id, None)
-        if new_status:
-            if entry._target_id == config.channels['vc']:
-                await general.send(config.message('edit_vc', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
-            elif entry._target_id == config.channels['vc2']:
-                await general.send(config.message('edit_vc_2', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
-            elif entry._target_id == config.channels['vc3']:
-                await general.send(config.message('edit_vc_3', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
-        else:
-            if entry._target_id == config.channels['vc']:
-                await general.send(config.message('edit_vc_no_status', member=entry.user.mention), pings=discord.AllowedMentions.none())
-            elif entry._target_id == config.channels['vc2']:
-                await general.send(config.message('edit_vc_2_no_status', member=entry.user.mention), pings=discord.AllowedMentions.none())
-            elif entry._target_id == config.channels['vc3']:
-                await general.send(config.message('edit_vc_3_no_status', member=entry.user.mention), pings=discord.AllowedMentions.none())
+        vc: VoiceChannel = bot.get_channel(config.channels['vc'])
+        vc2 = bot.get_channel(config.channels['vc2'])
+        vc3 = bot.get_channel(config.channels['vc3'])
+
+        new_status = None
+
+        if bot.get_channel(entry._target_id) == vc:
+            new_status = vc.status
+            if new_status: await general.send(config.message('edit_vc', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
+            else: await general.send(config.message('edit_vc_no_status', member=entry.user.mention), pings=discord.AllowedMentions.none())
+        elif bot.get_channel(entry._target_id) == vc2:
+            if new_status: await general.send(config.message('edit_vc_2', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
+            else: await general.send(config.message('edit_vc_2_no_status', member=entry.user.mention), pings=discord.AllowedMentions.none())
+        elif bot.get_channel(entry._target_id) == vc3:
+            if new_status: await general.send(config.message('edit_vc_3', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
+            else: await general.send(config.message('edit_vc_3_no_status', member=entry.user.mention), pings=discord.AllowedMentions.none())
+
     elif entry.action.value == 193:
         if entry._target_id == config.channels['vc']:
             await general.send(config.message('edit_vc_clear', member=entry.user.mention), pings=discord.AllowedMentions.none())

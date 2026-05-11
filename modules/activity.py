@@ -28,7 +28,7 @@ async def voice_check(rs: RoleSession, member: discord.Member) -> None:
                 await send(
                     config.message(
                         join_msg_id,
-                        member=member.display_name,
+                        member=member.mention,
                         count=emojify(str(members), color),
                     )
                 )
@@ -41,7 +41,7 @@ async def voice_check(rs: RoleSession, member: discord.Member) -> None:
                 await send(
                     config.message(
                         leave_msg_id,
-                        member=member.display_name,
+                        member=member.mention,
                         count=emojify(str(members), color),
                     )
                 )
@@ -50,9 +50,9 @@ async def voice_check(rs: RoleSession, member: discord.Member) -> None:
             if has_role(member, config.roles['available']):
                 rs.add(config.roles[reverse_role])
 
-    await check('vc', 'in_vc', 'in_vc_leader', 'available_not_in_vc', 'join_vc', 'leave_vc')
-    await check('vc2', 'in_vc_2', 'in_vc_2_leader', 'available_not_in_vc_2', 'join_vc_2', 'leave_vc_2', 'p')
-    await check('vc3', 'in_vc_3', 'in_vc_3_leader', 'available_not_in_vc_3', 'join_vc_3', 'leave_vc_3', 'r')
+    await check('vc', 'in_vc', 'in_vc_leader', 'available_not_in_vc', 'join_vc_force', 'leave_vc_force')
+    await check('vc2', 'in_vc_2', 'in_vc_2_leader', 'available_not_in_vc_2', 'join_vc_2_force', 'leave_vc_2_force', 'p')
+    await check('vc3', 'in_vc_3', 'in_vc_3_leader', 'available_not_in_vc_3', 'join_vc_3_force', 'leave_vc_3_force', 'r')
 
 
 async def add_availability(rs: RoleSession, member: discord.Member) -> None:
