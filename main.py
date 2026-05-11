@@ -1734,6 +1734,7 @@ async def on_socket_raw_receive(msg):
     try:
         data = json.loads(msg)
     except Exception:
+        print('on socket raw receive exception')
         return
 
     t = data.get("t")
