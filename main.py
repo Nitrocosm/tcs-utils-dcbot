@@ -13,12 +13,13 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-10'
+version = 'v5.0.6-11'
 
 changelog = \
 f"""
 ## {version} changelog
-- fix message in chat for changing the voice channels' status again
+- again & again & again
+  - like that one deleted modifier?
 """
 
 ################################################################
@@ -1727,12 +1728,13 @@ async def create_challenge(
 @bot.event
 async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
     if entry.action.value == 192:
+        new_status = getattr(entry.changes.after, "status", None)
         if entry._target_id == config.channels['vc']:
-            await general.send(config.message('edit_vc', member=entry.user.mention, status=entry.changes.after[0]), pings=discord.AllowedMentions.none())
+            await general.send(config.message('edit_vc', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
         elif entry._target_id == config.channels['vc2']:
-            await general.send(config.message('edit_vc_2', member=entry.user.mention, status=entry.changes.after[0]), pings=discord.AllowedMentions.none())
+            await general.send(config.message('edit_vc_2', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
         elif entry._target_id == config.channels['vc3']:
-            await general.send(config.message('edit_vc_3', member=entry.user.mention, status=entry.changes.after[0]), pings=discord.AllowedMentions.none())
+            await general.send(config.message('edit_vc_3', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
     elif entry.action.value == 193:
         if entry._target_id == config.channels['vc']:
             await general.send(config.message('edit_vc_clear', member=entry.user.mention), pings=discord.AllowedMentions.none())
