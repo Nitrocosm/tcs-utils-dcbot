@@ -224,7 +224,7 @@ async def _do_verify(thread: discord.Thread, state: dict, user_id: int, mention:
     await thread.send(f"<:yes:1463357188964618413> {mention} verified this // {remaining} more needed", allowed_mentions=_no_ping())
     await _set_tags(thread, [TAG_NEEDS_VERIFICATION, _verifier_tag(remaining)])
     content = _build_challenge_message(state, thread.guild)
-    await bot_msg.edit(content=content, view=VerificationView(remaining), suppress_embeds=True)
+    await bot_msg.edit(content=content, view=VerificationView(remaining), suppress=True)
 
 # ── Flow functions ──────────────────────────────────────────────────────────
 
@@ -274,7 +274,7 @@ async def _process_video(video_id: str, thread: discord.Thread, state: dict, bot
         _save_state()
         await _set_tags(thread, [TAG_UPLOADING])
         content = _build_challenge_message(state, thread.guild)
-        await bot_msg.edit(content=content, allowed_mentions=_no_ping(), suppress_embeds=True)
+        await bot_msg.edit(content=content, allowed_mentions=_no_ping(), suppress=True)
         if not video_polling_loop.is_running():
             video_polling_loop.start()
 
@@ -286,7 +286,7 @@ async def _enter_verification_phase(thread: discord.Thread, state: dict, bot_msg
     await _set_tags(thread, tag_ids)
     content = _build_challenge_message(state, thread.guild)
     view = VerificationView(needed)
-    await bot_msg.edit(content=content, view=view, allowed_mentions=_no_ping(), suppress_embeds=True)
+    await bot_msg.edit(content=content, view=view, allowed_mentions=_no_ping(), suppress=True)
     if not state.get('verifier_pinged'):
         await thread.send(f"<:required:1463357222632292458> <@&{VERIFIER_ROLE_ID}> new challenge to verify!\n"
                           f"-# when you finish watching the video, go to top bot message and click \"verify\"\n"
@@ -312,7 +312,7 @@ async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: d
             await bot_msg.edit(content="# <:doors_trophy:1499481077272674456> this run is verified!", view=None, allowed_mentions=_no_ping())
         except:
             pass
-    await thread.edit(archived=True, locked=True)
+    await thread.edit(archived=True, locked=False)
     _clean_state(thread.id)
 
 # ── Message listeners ──────────────────────────────────────────────────────
@@ -786,7 +786,7 @@ class ReportResolveView(View):
         await _set_tags(thread, [TAG_NEEDS_VERIFICATION, _verifier_tag(remaining)])
         content = _build_challenge_message(state, interaction.guild)
         view = VerificationView(remaining)
-        await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping(), suppress_embeds=True)
+        await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping(), suppress=True)
         await thread.send(f"report resolved by {interaction.user.mention}", allowed_mentions=_no_ping())
 
 
