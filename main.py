@@ -1154,7 +1154,7 @@ async def update(ctx):
         res = result.stdout.splitlines()
         for line in res:
             res = f'{res}\n-# {line}'
-        await ctx.send(content=f':radio_button: pulled from git!```{res}```')
+        await ctx.send(content=f':radio_button: pulled from git!{res}')
         await ctx.send(content=f':radio_button: restarting bot...')
         subprocess.Popen(['systemctl', 'restart', '--user', 'tcs-utils-dcbot'])
 
@@ -1730,8 +1730,8 @@ async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
         raw_changes = getattr(entry, "_changes", [])
         new_status = None
         #old_status = None
+        print(raw_changes)
         for change in raw_changes:
-            await general.send(f'{change.get('key')}')
             if change.get("key") == "status":
                 new_status = change.get("new_value")
                 #old_status = change.get("old_value")
