@@ -68,11 +68,13 @@ def _init_state(thread_id: int, op_id: int) -> dict:
         'selected_role_id': None,
         'menu_page': 0,
         'video_url': None,
+        'video_ready': False,
         'verifiers_needed': 0,
         'verifiers_done': 0,
         'verified_by': [],
         'report_resolved': False,
         'ignore': False,
+        'verifier_pinged': False,
     }
     return _state[k]
 
@@ -140,6 +142,10 @@ def _get_youtube_video_id(url: str) -> Optional[str]:
     m = YOUTUBE_RE.search(url)
     return m.group(1) if m else None
 
+def _get_youtube_url(text: str) -> Optional[str]:
+    m = YOUTUBE_RE.search(text)
+    return m.group(0) if m else None
+
 async def _check_youtube_video(video_id: str) -> str:
     url = f"https://www.youtube.com/watch?v={video_id}"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -159,18 +165,16 @@ async def _check_youtube_video(video_id: str) -> str:
                     data = None
                 if not data:
                     if "Video unavailable" in text or "This video is private" in text:
-                        return 'private'
-                    return 'available' if resp.status == 200 else 'private'
+                        return 'uploading'
+                    return 'available' if resp.status == 200 else 'uploading'
                 playability = data.get('playabilityStatus', {})
                 status = playability.get('status', 'ERROR')
                 reason = playability.get('reason', '') or playability.get('errorScreen', {}).get('reason', '')
                 if status == 'OK':
                     return 'available'
-                if 'processing' in reason.lower() or 'upload' in reason.lower():
-                    return 'uploading'
-                return 'private'
+                return 'uploading'
     except Exception:
-        return 'private'
+        return 'uploading'
 
 async def _set_tags(thread: discord.Thread, tag_ids: list[int]):
     tags = []
@@ -193,10 +197,11 @@ def _build_challenge_message(state: dict, guild: discord.Guild) -> str:
     name = info['name'] if info else "Unknown"
     lines = [f"# {role_mention}", f"{op_mention} completed {name} and awaits verification"]
     if state.get('video_url'):
-        lines.append("the video is uploading")
+        label = "<:yes:1463357188964618413> video is ready to watch" if state.get('video_ready') else "<:doors_globe:1499578536904622101> the video is uploading"
+        lines.append(label)
         lines.append(f"-# {state['video_url']}")
     else:
-        lines.append("there is no video yet")
+        lines.append("waiting for video link")
     return "\n".join(lines)
 
 def _no_ping():
@@ -212,14 +217,14 @@ async def _do_verify(thread: discord.Thread, state: dict, user_id: int, mention:
     state['verifiers_done'] += 1
     remaining = state['verifiers_needed'] - state['verifiers_done']
     if remaining <= 0:
-        await thread.send(f"{mention} marked this as verified - 0 more needed", allowed_mentions=_no_ping())
+        await thread.send(f"<:yes:1463357188964618413> {mention} verified this // no more verifications needed", allowed_mentions=_no_ping())
         await _complete_verification(thread, state, bot_msg)
         return
     _save_state()
-    await thread.send(f"{mention} marked this as verified - {remaining} more needed", allowed_mentions=_no_ping())
+    await thread.send(f"<:yes:1463357188964618413> {mention} verified this // {remaining} more needed", allowed_mentions=_no_ping())
     await _set_tags(thread, [TAG_NEEDS_VERIFICATION, _verifier_tag(remaining)])
     content = _build_challenge_message(state, thread.guild)
-    await bot_msg.edit(content=content, view=VerificationView(remaining))
+    await bot_msg.edit(content=content, view=VerificationView(remaining), suppress_embeds=True)
 
 # ── Flow functions ──────────────────────────────────────────────────────────
 
@@ -243,14 +248,15 @@ async def _handle_video_check(starter_msg: discord.Message, thread: discord.Thre
     if not video_id:
         await _ask_for_video(thread, state, bot_msg)
         return
-    state['video_url'] = content
+    video_url = _get_youtube_url(content) or content
+    state['video_url'] = video_url
     _save_state()
     await _process_video(video_id, thread, state, bot_msg)
 
 async def _ask_for_video(thread: discord.Thread, state: dict, bot_msg: discord.Message):
     op_id = state['op_id']
     content = _build_challenge_message(state, thread.guild)
-    content += f"\n\n<@{op_id}> please either edit your original post to add a youtube link, or send it here"
+    content += f"\n\n<@{op_id}> please either edit your original post to add a youtube link or send it here"
     view = NoFootageView()
     await bot_msg.edit(content=content, view=view, allowed_mentions=_no_ping())
     state['state'] = 'awaiting_video'
@@ -259,23 +265,18 @@ async def _ask_for_video(thread: discord.Thread, state: dict, bot_msg: discord.M
 async def _process_video(video_id: str, thread: discord.Thread, state: dict, bot_msg: discord.Message):
     status = await _check_youtube_video(video_id)
     if status == 'available':
+        state['video_ready'] = True
         state['state'] = 'needs_verification'
         _save_state()
         await _enter_verification_phase(thread, state, bot_msg)
-    elif status == 'uploading':
+    else:
         state['state'] = 'awaiting_upload'
         _save_state()
         await _set_tags(thread, [TAG_UPLOADING])
         content = _build_challenge_message(state, thread.guild)
-        await bot_msg.edit(content=content, allowed_mentions=_no_ping())
+        await bot_msg.edit(content=content, allowed_mentions=_no_ping(), suppress_embeds=True)
         if not video_polling_loop.is_running():
             video_polling_loop.start()
-    else:
-        op_id = state['op_id']
-        content = _build_challenge_message(state, thread.guild)
-        content += f"\n\n<@{op_id}> that video is private or doesn't exist. please provide a different link, or wait until it's available"
-        view = NoFootageView()
-        await bot_msg.edit(content=content, view=view, allowed_mentions=_no_ping())
 
 async def _enter_verification_phase(thread: discord.Thread, state: dict, bot_msg: discord.Message):
     needed = state['verifiers_needed']
@@ -285,8 +286,15 @@ async def _enter_verification_phase(thread: discord.Thread, state: dict, bot_msg
     await _set_tags(thread, tag_ids)
     content = _build_challenge_message(state, thread.guild)
     view = VerificationView(needed)
-    await bot_msg.edit(content=content, view=view, allowed_mentions=_no_ping())
-    await thread.send(f"<@&{VERIFIER_ROLE_ID}> new challenge to verify")
+    await bot_msg.edit(content=content, view=view, allowed_mentions=_no_ping(), suppress_embeds=True)
+    if not state.get('verifier_pinged'):
+        await thread.send(f"<:required:1463357222632292458> <@&{VERIFIER_ROLE_ID}> new challenge to verify!\n"
+                          f"-# when you finish watching the video, go to top bot message and click \"verify\"\n"
+                          f"-# if you either find something bad or need mod asssistance, click \"report\" to add the reported tag and ping moderators\n"
+                          f"-# make sure the uploader selected the correct challenge\n"
+                          f"-# the bot will automatically give the uploader the challenge completion roles when the verification process is complete\n")
+        state['verifier_pinged'] = True
+        _save_state()
 
 async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: discord.Message = None):
     state['state'] = 'verified'
@@ -298,10 +306,10 @@ async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: d
     if member and role_id:
         async with RoleSession(member) as rs:
             rs.add(role_id)
-    await thread.send("this run has been verified! :white_check_mark:", allowed_mentions=_no_ping())
+    await thread.send("<:doors_trophy:1499481077272674456> this run has been verified!\n-# the roles were given automatically", allowed_mentions=_no_ping())
     if bot_msg:
         try:
-            await bot_msg.edit(content="this run has been verified! :white_check_mark:", view=None, allowed_mentions=_no_ping())
+            await bot_msg.edit(content="# <:doors_trophy:1499481077272674456> this run is verified!", view=None, allowed_mentions=_no_ping())
         except:
             pass
     await thread.edit(archived=True, locked=True)
@@ -327,7 +335,7 @@ async def on_verification_message(message: discord.Message):
     video_id = _get_youtube_video_id(message.content)
     if not video_id:
         return
-    state['video_url'] = message.content
+    state['video_url'] = _get_youtube_url(message.content) or message.content
     _save_state()
     try:
         bot_msg = await message.channel.fetch_message(state['message_id'])
@@ -352,7 +360,7 @@ async def on_verification_message_edit(before: discord.Message, after: discord.M
     video_id = _get_youtube_video_id(after.content)
     if not video_id:
         return
-    state['video_url'] = after.content
+    state['video_url'] = _get_youtube_url(after.content) or after.content
     _save_state()
     try:
         bot_msg = await after.channel.fetch_message(state['message_id'])
@@ -382,7 +390,7 @@ class ChallengeCategoryView(View):
         official, custom, joke = _get_challenge_roles(interaction.guild)
         roles = {'official': official, 'custom': custom, 'joke': joke}[category]
         view = ChallengeMenuView(category, roles, 0, interaction.guild)
-        await interaction.response.edit_message(content="pick a challenge:", view=view)
+        await interaction.response.edit_message(content="# <@{state['op_id']}>, what challenge did you do?\nselect from the dropdown below", view=view)
 
     @discord.ui.button(label="official challenge", style=discord.ButtonStyle.secondary, custom_id="v:cat:off")
     async def official_btn(self, interaction: discord.Interaction, button: Button):
@@ -407,7 +415,9 @@ class ChallengeCategoryView(View):
         _save_state()
         view = ReopenView()
         await interaction.response.edit_message(
-            content="ok, i'll ignore this thread then - if you wish to make this thread a verification request again - click the button below",
+            content="# <:disconnect:1499465485144686682> this thread is ignored\n"
+                    "op stated that this is an incomplete or failed run."
+                    "op, if you wish to make this thread a verification request again - click the button below",
             view=view,
             allowed_mentions=_no_ping(),
         )
@@ -428,7 +438,7 @@ class ReopenView(View):
         _save_state()
         view = ChallengeCategoryView()
         await interaction.response.edit_message(
-            content=f"hey <@{state['op_id']}>! what challenge did you do?",
+            content=f"# <@{state['op_id']}>, what challenge did you do?\nselect from categories below",
             view=view,
         )
 
@@ -464,7 +474,7 @@ class ChallengeMenuView(View):
             options.append(discord.SelectOption(label=label, value=str(role.id), emoji=emoji))
         if not options:
             options.append(discord.SelectOption(label="no challenges available", value="none"))
-        select = Select(placeholder="choose a challenge...", options=options, custom_id="v:menu")
+        select = Select(placeholder="select a challenge...", options=options, custom_id="v:menu")
         select.callback = self._on_select
         self.add_item(select)
 
@@ -488,7 +498,7 @@ class ChallengeMenuView(View):
             state['selected_category'] = category
             state['menu_page'] = 0
             _save_state()
-            await interaction.response.edit_message(content="pick a challenge:", view=ChallengeMenuView(category, roles, 0, interaction.guild))
+            await interaction.response.edit_message(content="# <@{state['op_id']}>, what challenge did you do?\nselect from the dropdown below", view=ChallengeMenuView(category, roles, 0, interaction.guild))
         return cb
 
     def _make_page_cb(self, delta: int):
@@ -503,7 +513,7 @@ class ChallengeMenuView(View):
             new_page = state['menu_page'] + delta
             state['menu_page'] = new_page
             _save_state()
-            await interaction.response.edit_message(content="pick a challenge:", view=ChallengeMenuView(cat, roles, new_page, interaction.guild))
+            await interaction.response.edit_message(content="# <@{state['op_id']}>, what challenge did you do?\nselect from the dropdown below", view=ChallengeMenuView(cat, roles, new_page, interaction.guild))
         return cb
 
     async def _on_select(self, interaction: discord.Interaction):
@@ -529,10 +539,18 @@ class ChallengeMenuView(View):
             state['verifiers_needed'] = _verifiers_for_points(info['points'])
         state['state'] = 'challenge_selected'
         _save_state()
+        thread = interaction.channel
+        if isinstance(thread, discord.Thread):
+            op = thread.guild.get_member(state['op_id'])
+            op_name = op.display_name if op else f"user-{state['op_id']}"
+            new_name = f"{info['name']} by {op_name}"[:100]
+            try:
+                await thread.edit(name=new_name)
+            except:
+                pass
         content = _build_challenge_message(state, interaction.guild)
         view = ChallengeConfirmView()
         await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping())
-        thread = interaction.channel
         if isinstance(thread, discord.Thread):
             try:
                 starter = await thread.fetch_message(thread.id)
@@ -566,13 +584,16 @@ class ChallengeConfirmView(View):
         if interaction.user.id != state['op_id']:
             await interaction.response.send_message("this isn't for you", ephemeral=True)
             return
+        if state.get('verifiers_done', 0) > 0:
+            await interaction.response.send_message("can't change challenge after one or more verifications happened", ephemeral=True)
+            return
         official, custom, joke = _get_challenge_roles(interaction.guild)
         cat = state.get('selected_category', 'official')
         roles = {'official': official, 'custom': custom, 'joke': joke}[cat]
         state['state'] = 'choose_challenge'
         _save_state()
         view = ChallengeMenuView(cat, roles, 0, interaction.guild)
-        await interaction.response.edit_message(content="pick a challenge:", view=view)
+        await interaction.response.edit_message(content="# <@{state['op_id']}>, what challenge did you do?\nselect from the dropdown below", view=view)
 
 
 class NoFootageView(View):
@@ -690,7 +711,13 @@ class VerificationView(View):
             return
 
         await interaction.response.send_message(
-            "are you sure you want to report this verification?",
+            "# sure about that?\n"
+            "reporting runs to moderators can be done for a multitude of different reasons.\n"
+            "reporting something doesn't immediately mean the runner is cheating or did something bad; "
+            "it can also mean that the bot's limited system isn't capable of doing what is needed (ex. giving more than a single role), "
+            "or the op not choosing the correct challenge on accident and being unable to change it, or anything else, really, that requires assistance.\n"
+            "**note that reporting a run locks its verifications until the report resolved.**\n"
+            "### are you sure you want to escalate this thread?",
             view=ReportConfirmView(),
             ephemeral=True,
         )
@@ -700,13 +727,16 @@ class VerificationView(View):
         if interaction.user.id != state['op_id']:
             await interaction.response.send_message("this isn't for you", ephemeral=True)
             return
+        if state.get('verifiers_done', 0) > 0:
+            await interaction.response.send_message("can't change challenge after a verification has happened", ephemeral=True)
+            return
         official, custom, joke = _get_challenge_roles(interaction.guild)
         cat = state.get('selected_category', 'official')
         roles = {'official': official, 'custom': custom, 'joke': joke}[cat]
         state['state'] = 'choose_challenge'
         _save_state()
         view = ChallengeMenuView(cat, roles, 0, interaction.guild)
-        await interaction.response.edit_message(content="pick a challenge:", view=view)
+        await interaction.response.edit_message(content="# <@{state['op_id']}>, what challenge did you do?\nselect from the dropdown below", view=view)
 
 
 class ReportConfirmView(View):
@@ -720,8 +750,8 @@ class ReportConfirmView(View):
         _save_state()
         thread = interaction.channel
         await _set_tags(thread, [TAG_REPORTED])
-        await interaction.response.edit_message(content="this verification has been reported", view=None)
-        await thread.send(f"<@&{MOD_ROLE_ID}> this verification has been reported")
+        await interaction.response.edit_message(content="this run has been reported", view=None)
+        await thread.send(f"<@&{MOD_ROLE_ID}> this run has been reported")
         main_msg = thread.get_partial_message(state['message_id'])
         try:
             await main_msg.edit(view=ReportResolveView())
@@ -756,13 +786,13 @@ class ReportResolveView(View):
         await _set_tags(thread, [TAG_NEEDS_VERIFICATION, _verifier_tag(remaining)])
         content = _build_challenge_message(state, interaction.guild)
         view = VerificationView(remaining)
-        await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping())
+        await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping(), suppress_embeds=True)
         await thread.send(f"report resolved by {interaction.user.mention}", allowed_mentions=_no_ping())
 
 
 # ── Polling ─────────────────────────────────────────────────────────────────
 
-@tasks.loop(minutes=15)
+@tasks.loop(minutes=5)
 async def video_polling_loop():
     for key, s in list(_state.items()):
         if s.get('state') != 'awaiting_upload':
@@ -788,6 +818,8 @@ async def video_polling_loop():
             msg = await thread.fetch_message(s['message_id'])
         except:
             continue
+        s['video_ready'] = True
+        _save_state()
         await _enter_verification_phase(thread, s, msg)
 
 
@@ -848,4 +880,6 @@ async def restore_sessions(client: discord.Client):
             bot_msg = await thread.fetch_message(s['message_id'])
         except:
             continue
+        s['video_ready'] = True
+        _save_state()
         await _enter_verification_phase(thread, s, bot_msg)

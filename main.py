@@ -758,7 +758,7 @@ async def on_thread_create(thread: discord.Thread):
             current_tags.append(tag)
             await thread.edit(applied_tags=current_tags)
 
-    await thread.send(f"<:required:1463357222632292458> <@&{ROLE_ID}> new challenge to verify")
+    await thread.send(f"<@&{ROLE_ID}> new challenge to verify")
     #------------------------------------
 
 
