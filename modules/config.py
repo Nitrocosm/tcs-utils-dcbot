@@ -297,10 +297,13 @@ _messages = {
     ],
 
     "edit_vc": [f"{emoji['edit_g']} **{{member}}** set the first voice channel's status to **{{status}}**"],
+    "edit_vc_no_status": [f"{emoji['edit_g']} **{{member}}** set the first voice channel's status"],
     "edit_vc_clear": [f"{emoji['edit_g']} **{{member}}** cleared the first voice channel's status"],
     "edit_vc_2": [f"{emoji['edit_p']} **{{member}}** set the second voice channel's status to **{{status}}**"],
+    "edit_vc_2_no_status": [f"{emoji['edit_p']} **{{member}}** set the second voice channel's status"],
     "edit_vc_2_clear": [f"{emoji['edit_p']} **{{member}}** cleared the second voice channel's status"],
     "edit_vc_3": [f"{emoji['edit_r']} **{{member}}** set the third voice channel's status to **{{status}}**"],
+    "edit_vc_3_no_status": [f"{emoji['edit_r']} **{{member}}** set the third voice channel's status"],
     "edit_vc_3_clear": [f"{emoji['edit_r']} **{{member}}** cleared the third voice channel's status"],
 
     "promotion": [

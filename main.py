@@ -1749,12 +1749,20 @@ async def on_socket_raw_receive(msg):
 async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
     if entry.action.value == 192:
         new_status = _pending_vc_status.pop(entry.id, None)
-        if entry._target_id == config.channels['vc']:
-            await general.send(config.message('edit_vc', member=entry.user.mention, status=(new_status if new_status else '`[failed to fetch :skull:]`')), pings=discord.AllowedMentions.none()) # <-- always says that new status failed to fetch
-        elif entry._target_id == config.channels['vc2']:
-            await general.send(config.message('edit_vc_2', member=entry.user.mention, status=(new_status if new_status else '`[failed to fetch :skull:]`')), pings=discord.AllowedMentions.none())
-        elif entry._target_id == config.channels['vc3']:
-            await general.send(config.message('edit_vc_3', member=entry.user.mention, status=(new_status if new_status else '`[failed to fetch :skull:]`')), pings=discord.AllowedMentions.none())
+        if new_status:
+            if entry._target_id == config.channels['vc']:
+                await general.send(config.message('edit_vc', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
+            elif entry._target_id == config.channels['vc2']:
+                await general.send(config.message('edit_vc_2', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
+            elif entry._target_id == config.channels['vc3']:
+                await general.send(config.message('edit_vc_3', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
+        else:
+            if entry._target_id == config.channels['vc']:
+                await general.send(config.message('edit_vc_no_status', member=entry.user.mention), pings=discord.AllowedMentions.none())
+            elif entry._target_id == config.channels['vc2']:
+                await general.send(config.message('edit_vc_2_no_status', member=entry.user.mention), pings=discord.AllowedMentions.none())
+            elif entry._target_id == config.channels['vc3']:
+                await general.send(config.message('edit_vc_3_no_status', member=entry.user.mention), pings=discord.AllowedMentions.none())
     elif entry.action.value == 193:
         if entry._target_id == config.channels['vc']:
             await general.send(config.message('edit_vc_clear', member=entry.user.mention), pings=discord.AllowedMentions.none())
