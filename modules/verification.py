@@ -288,13 +288,13 @@ async def _enter_verification_phase(thread: discord.Thread, state: dict, bot_msg
     view = VerificationView(needed)
     await bot_msg.edit(content=content, view=view, allowed_mentions=_no_ping(), suppress=True)
     if not state.get('verifier_pinged'):
+        state['verifier_pinged'] = True
+        _save_state()
         await thread.send(f"<:required:1463357222632292458> <@&{VERIFIER_ROLE_ID}> new challenge to verify!\n"
                           f"-# when you finish watching the video, go to top bot message and click \"verify\"\n"
                           f"-# if you either find something bad or need mod asssistance, click \"report\" to add the reported tag and ping moderators\n"
                           f"-# make sure the uploader selected the correct challenge\n"
                           f"-# the bot will automatically give the uploader the challenge completion roles when the verification process is complete\n")
-        state['verifier_pinged'] = True
-        _save_state()
 
 async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: discord.Message = None):
     state['state'] = 'verified'
@@ -390,7 +390,7 @@ class ChallengeCategoryView(View):
         official, custom, joke = _get_challenge_roles(interaction.guild)
         roles = {'official': official, 'custom': custom, 'joke': joke}[category]
         view = ChallengeMenuView(category, roles, 0, interaction.guild)
-        await interaction.response.edit_message(content="# <@{state['op_id']}>, what challenge did you do?\nselect from the dropdown below", view=view)
+        await interaction.response.edit_message(content="# what challenge did you do?\nselect from the dropdown below", view=view)
 
     @discord.ui.button(label="official challenge", style=discord.ButtonStyle.secondary, custom_id="v:cat:off")
     async def official_btn(self, interaction: discord.Interaction, button: Button):
@@ -498,7 +498,7 @@ class ChallengeMenuView(View):
             state['selected_category'] = category
             state['menu_page'] = 0
             _save_state()
-            await interaction.response.edit_message(content="# <@{state['op_id']}>, what challenge did you do?\nselect from the dropdown below", view=ChallengeMenuView(category, roles, 0, interaction.guild))
+            await interaction.response.edit_message(content="# what challenge did you do?\nselect from the dropdown below", view=ChallengeMenuView(category, roles, 0, interaction.guild))
         return cb
 
     def _make_page_cb(self, delta: int):
@@ -513,7 +513,7 @@ class ChallengeMenuView(View):
             new_page = state['menu_page'] + delta
             state['menu_page'] = new_page
             _save_state()
-            await interaction.response.edit_message(content="# <@{state['op_id']}>, what challenge did you do?\nselect from the dropdown below", view=ChallengeMenuView(cat, roles, new_page, interaction.guild))
+            await interaction.response.edit_message(content="# what challenge did you do?\nselect from the dropdown below", view=ChallengeMenuView(cat, roles, new_page, interaction.guild))
         return cb
 
     async def _on_select(self, interaction: discord.Interaction):
@@ -593,7 +593,7 @@ class ChallengeConfirmView(View):
         state['state'] = 'choose_challenge'
         _save_state()
         view = ChallengeMenuView(cat, roles, 0, interaction.guild)
-        await interaction.response.edit_message(content="# <@{state['op_id']}>, what challenge did you do?\nselect from the dropdown below", view=view)
+        await interaction.response.edit_message(content="# what challenge did you do?\nselect from the dropdown below", view=view)
 
 
 class NoFootageView(View):
@@ -736,7 +736,7 @@ class VerificationView(View):
         state['state'] = 'choose_challenge'
         _save_state()
         view = ChallengeMenuView(cat, roles, 0, interaction.guild)
-        await interaction.response.edit_message(content="# <@{state['op_id']}>, what challenge did you do?\nselect from the dropdown below", view=view)
+        await interaction.response.edit_message(content="# what challenge did you do?\nselect from the dropdown below", view=view)
 
 
 class ReportConfirmView(View):
@@ -795,32 +795,35 @@ class ReportResolveView(View):
 @tasks.loop(minutes=5)
 async def video_polling_loop():
     for key, s in list(_state.items()):
-        if s.get('state') != 'awaiting_upload':
-            continue
-        video_url = s.get('video_url')
-        if not video_url:
-            continue
-        video_id = _get_youtube_video_id(video_url)
-        if not video_id:
-            continue
-        status = await _check_youtube_video(video_id)
-        if status != 'available':
-            continue
-        thread = bot.get_channel(s['thread_id'])
-        if not isinstance(thread, discord.Thread):
+        try:
+            if s.get('state') != 'awaiting_upload':
+                continue
+            video_url = s.get('video_url')
+            if not video_url:
+                continue
+            video_id = _get_youtube_video_id(video_url)
+            if not video_id:
+                continue
+            status = await _check_youtube_video(video_id)
+            if status != 'available':
+                continue
+            thread = bot.get_channel(s['thread_id'])
+            if not isinstance(thread, discord.Thread):
+                try:
+                    thread = await bot.fetch_channel(s['thread_id'])
+                except:
+                    continue
+                if not isinstance(thread, discord.Thread):
+                    continue
             try:
-                thread = await bot.fetch_channel(s['thread_id'])
+                msg = await thread.fetch_message(s['message_id'])
             except:
                 continue
-            if not isinstance(thread, discord.Thread):
-                continue
-        try:
-            msg = await thread.fetch_message(s['message_id'])
-        except:
-            continue
-        s['video_ready'] = True
-        _save_state()
-        await _enter_verification_phase(thread, s, msg)
+            s['video_ready'] = True
+            _save_state()
+            await _enter_verification_phase(thread, s, msg)
+        except Exception:
+            pass  # keep the loop alive on transient errors
 
 
 # ── Restore ─────────────────────────────────────────────────────────────────
@@ -866,6 +869,10 @@ async def restore_sessions(client: discord.Client):
     for s in list(_state.values()):
         if s.get('state') != 'awaiting_upload':
             continue
+        if s.get('verifier_pinged'):
+            s['state'] = 'verification'
+            _save_state()
+            continue
         video_url = s.get('video_url')
         video_id = _get_youtube_video_id(video_url) if video_url else None
         if not video_id:
@@ -882,4 +889,7 @@ async def restore_sessions(client: discord.Client):
             continue
         s['video_ready'] = True
         _save_state()
-        await _enter_verification_phase(thread, s, bot_msg)
+        try:
+            await _enter_verification_phase(thread, s, bot_msg)
+        except Exception:
+            pass
