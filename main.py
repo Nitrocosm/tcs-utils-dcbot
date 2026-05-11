@@ -481,11 +481,14 @@ async def _on_join_request_create(payload: dict):
     username = user.get("global_name") or user.get("username", "unknown")
     request_id = payload.get("id")
 
+    # await general.send(
+    #     f'<:application_add:1501552015816527963> <@{user_id}> ({username}) sent a join application',
+    #     'mod_chat'
+    # )
     await general.send(
-        f'<:application_add:1501552015816527963> <@{user_id}> ({username}) sent a join application',
+        f'<:application_add:1501552015816527963> we got a new join application!',
         'mod_chat'
     )
-
 
 async def _on_join_request_delete(payload: dict):
     """
@@ -530,8 +533,10 @@ async def on_socket_raw_receive(msg: str):
 
     if event_type == "GUILD_JOIN_REQUEST_CREATE":
         await _on_join_request_create(payload)
-    elif event_type == "GUILD_JOIN_REQUEST_DELETE":
-        await _on_join_request_delete(payload)
+    # elif event_type == "GUILD_JOIN_REQUEST_DELETE":
+    #     await _on_join_request_delete(payload)
+
+    
 
 
 @bot.event
