@@ -13,7 +13,7 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-12'
+version = 'v5.0.6-13'
 
 changelog = \
 f"""
@@ -1731,6 +1731,7 @@ async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
         new_status = None
         #old_status = None
         for change in raw_changes:
+            await general.send(f'{change.get('key')}')
             if change.get("key") == "status":
                 new_status = change.get("new_value")
                 #old_status = change.get("old_value")
