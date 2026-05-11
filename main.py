@@ -1724,46 +1724,43 @@ async def create_challenge(
     )
 
 
+import json
+
+_pending_vc_status: dict[int, str | None] = {}
+
+
 @bot.event
-async def on_raw_audit_log_entry_create(payload):
-    print('audit log entry create fired')
-    if payload.action_type == 192:
-        print('it is action 192')
-        # payload.extra is a dict containing 'options' for raw events
-        options = getattr(payload, 'extra', {}) or {}
-        new_status = options.get('status')
+async def on_socket_raw_receive(msg):
+    try:
+        data = json.loads(msg)
+    except Exception:
+        return
 
-        # We find which channel it is
-        target_id = payload.target_id
+    t = data.get("t")
+    d = data.get("d")
 
-        if target_id == config.channels['vc']:
-            await general.send(
-                config.message('edit_vc', member=f"<@{payload.user_id}>", status=(new_status if new_status else '`[failed to fetch :skull:]`')),
-                pings=discord.AllowedMentions.none()
-            )
-        elif target_id == config.channels['vc2']:
-            await general.send(
-                config.message('edit_vc_2', member=f"<@{payload.user_id}>", status=(new_status if new_status else '`[failed to fetch :skull:]`')),
-                pings=discord.AllowedMentions.none()
-            )
-        elif target_id == config.channels['vc3']:
-            await general.send(
-                config.message('edit_vc_3', member=f"<@{payload.user_id}>", status=(new_status if new_status else '`[failed to fetch :skull:]`')),
-                pings=discord.AllowedMentions.none()
-            )
+    if t == "GUILD_AUDIT_LOG_ENTRY_CREATE":
+        print("RAW AUDIT EVENT:")
+        print(data)
 
-    elif payload.action_type == 193:
-        target_id = payload.target_id
-        if target_id == config.channels['vc']:
-            await general.send(config.message('edit_vc_clear', member=f"<@{payload.user_id}>"),
-                               pings=discord.AllowedMentions.none())
-        elif target_id == config.channels['vc2']:
-            await general.send(config.message('edit_vc_2_clear', member=f"<@{payload.user_id}>"),
-                               pings=discord.AllowedMentions.none())
-        elif target_id == config.channels['vc3']:
-            await general.send(config.message('edit_vc_3_clear', member=f"<@{payload.user_id}>"),
-                               pings=discord.AllowedMentions.none())
 
+@bot.event
+async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
+    if entry.action.value == 192:
+        new_status = _pending_vc_status.pop(entry.id, None)
+        if entry._target_id == config.channels['vc']:
+            await general.send(config.message('edit_vc', member=entry.user.mention, status=(new_status if new_status else '`[failed to fetch :skull:]`')), pings=discord.AllowedMentions.none()) # <-- always says that new status failed to fetch
+        elif entry._target_id == config.channels['vc2']:
+            await general.send(config.message('edit_vc_2', member=entry.user.mention, status=(new_status if new_status else '`[failed to fetch :skull:]`')), pings=discord.AllowedMentions.none())
+        elif entry._target_id == config.channels['vc3']:
+            await general.send(config.message('edit_vc_3', member=entry.user.mention, status=(new_status if new_status else '`[failed to fetch :skull:]`')), pings=discord.AllowedMentions.none())
+    elif entry.action.value == 193:
+        if entry._target_id == config.channels['vc']:
+            await general.send(config.message('edit_vc_clear', member=entry.user.mention), pings=discord.AllowedMentions.none())
+        elif entry._target_id == config.channels['vc2']:
+            await general.send(config.message('edit_vc_2_clear', member=entry.user.mention), pings=discord.AllowedMentions.none())
+        elif entry._target_id == config.channels['vc3']:
+            await general.send(config.message('edit_vc_3_clear', member=entry.user.mention), pings=discord.AllowedMentions.none())
 
 if __name__ == '__main__':
     bot.run(config.TOKEN)
