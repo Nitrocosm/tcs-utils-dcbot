@@ -13,7 +13,7 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-13'
+version = 'v5.0.6-14'
 
 changelog = \
 f"""
