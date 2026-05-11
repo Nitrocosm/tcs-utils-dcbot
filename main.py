@@ -13,12 +13,12 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-6'
+version = 'v5.0.6-7'
 
 changelog = \
 f"""
 :tada: **{version} changelog**
-- fix challenge names with dashes not showing their badges properly
+- add a debug thing
 """
 
 ################################################################
@@ -96,7 +96,6 @@ async def check(ctx, member: discord.Member):
 
 @bot.command()
 @general.try_bot_perms
-@general.has_perms('owner')
 async def test(ctx):
     await ctx.send(f'test pass\n-# {version}')
 
@@ -105,7 +104,7 @@ async def test(ctx):
 @general.has_perms('owner')
 async def force_reactions(ctx):
     await activity.sync_interested_reactions()
-    await ctx.send('uh huh')
+    await ctx.message.add_reaction("✅")
 
 
 
@@ -1719,6 +1718,29 @@ async def create_challenge(
         allowed_mentions=discord.AllowedMentions.none(),
     )
 
+
+
+send_audit_var = False
+
+@bot.command()
+@general.has_perms("owner")
+@general.try_bot_perms
+async def send_audit(ctx):
+    global send_audit_var
+    if send_audit_var:
+        await ctx.message.add_reaction("🪫")
+        send_audit_var = False
+    else:
+        await ctx.message.add_reaction("🔋")
+        send_audit_var = True
+
+
+@bot.event
+async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
+    log_channel = bot.get_channel(1503202664731906179)
+    if log_channel is None:
+        return
+    await log_channel.send(f'\ncategory: {entry.category}\n\nuser: {entry.user.mention}\naction: {entry.action}\nextra: {entry.extra}\nreason: {entry.reason}\n')
 
 
 if __name__ == '__main__':
