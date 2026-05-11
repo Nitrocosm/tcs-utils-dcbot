@@ -224,7 +224,7 @@ async def _do_verify(thread: discord.Thread, state: dict, user_id: int, mention:
     await thread.send(f"<:yes:1463357188964618413> {mention} verified this // {remaining} more needed", allowed_mentions=_no_ping())
     await _set_tags(thread, [TAG_NEEDS_VERIFICATION, _verifier_tag(remaining)])
     content = _build_challenge_message(state, thread.guild)
-    await bot_msg.edit(content=content, view=VerificationView(remaining), suppress=True)
+    await bot_msg.edit(content=content, view=VerificationView(remaining, hide_change=state['verifiers_done'] > 0), suppress=True)
 
 # ── Flow functions ──────────────────────────────────────────────────────────
 
@@ -285,7 +285,7 @@ async def _enter_verification_phase(thread: discord.Thread, state: dict, bot_msg
     tag_ids = [TAG_NEEDS_VERIFICATION, _verifier_tag(needed)]
     await _set_tags(thread, tag_ids)
     content = _build_challenge_message(state, thread.guild)
-    view = VerificationView(needed)
+    view = VerificationView(needed, hide_change=state['verifiers_done'] > 0)
     await bot_msg.edit(content=content, view=view, allowed_mentions=_no_ping(), suppress=True)
     if not state.get('verifier_pinged'):
         state['verifier_pinged'] = True
@@ -572,7 +572,7 @@ class ChallengeConfirmView(View):
         br.callback = self._dummy
         self.add_item(br)
 
-        bc = Button(label="change challenge", style=discord.ButtonStyle.primary, custom_id="v:cfg:change")
+        bc = Button(label="change challenge", style=discord.ButtonStyle.secondary, custom_id="v:cfg:change")
         bc.callback = self._on_change
         self.add_item(bc)
 
@@ -635,8 +635,31 @@ class OwnerVerifyPromptView(View):
         await interaction.response.edit_message(content="verification cancelled", view=None)
 
 
+class OwnerVerifySelfView(View):
+    def __init__(self):
+        super().__init__()
+
+    @discord.ui.button(label="yes, i'm sure, verify anyway", style=discord.ButtonStyle.primary)
+    async def confirm(self, interaction: discord.Interaction, button: Button):
+        state = _get_state(interaction.channel_id)
+        thread = interaction.channel
+        user_id = interaction.user.id
+        mention = interaction.user.mention
+        try:
+            bot_msg = await thread.fetch_message(state['message_id'])
+        except:
+            await interaction.response.edit_message(content="could not find the verification message", view=None)
+            return
+        await interaction.response.edit_message(content="proceeding...", view=None)
+        await _do_verify(thread, state, user_id, mention, bot_msg)
+
+    @discord.ui.button(label="cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.edit_message(content="verification cancelled", view=None)
+
+
 class VerificationView(View):
-    def __init__(self, verifiers_needed: int):
+    def __init__(self, verifiers_needed: int, hide_change: bool = False):
         super().__init__(timeout=None)
 
         vbtn = Button(label=f"verify ({verifiers_needed} more)", style=discord.ButtonStyle.success, custom_id="v:verify")
@@ -647,9 +670,10 @@ class VerificationView(View):
         rbtn.callback = self._on_report
         self.add_item(rbtn)
 
-        cbtn = Button(label="change challenge", style=discord.ButtonStyle.primary, custom_id="v:ver:change")
-        cbtn.callback = self._on_change
-        self.add_item(cbtn)
+        if not hide_change:
+            cbtn = Button(label="change challenge", style=discord.ButtonStyle.secondary, custom_id="v:ver:change")
+            cbtn.callback = self._on_change
+            self.add_item(cbtn)
 
     async def _is_verifier(self, interaction: discord.Interaction) -> bool:
         member = interaction.user
@@ -662,6 +686,9 @@ class VerificationView(View):
 
     async def _on_verify(self, interaction: discord.Interaction):
         state = _get_state(interaction.channel_id)
+        if state.get('state') in ('reported', 'manual'):
+            await interaction.response.send_message("this thread is locked for verification", ephemeral=True)
+            return
         user = interaction.user
         if not isinstance(user, discord.Member):
             user = interaction.guild.get_member(user.id)
@@ -670,12 +697,24 @@ class VerificationView(View):
             return
 
         is_owner = user.id == interaction.guild.owner_id
+        is_op = user.id == state['op_id']
         has_role = self._is_verifier(interaction)
         already = user.id in state.get('verified_by', [])
 
         if not is_owner and not has_role:
             await interaction.response.send_message("you don't have permission to do that", ephemeral=True)
             return
+
+        if is_op:
+            if is_owner:
+                prompt = OwnerVerifySelfView()
+                await interaction.response.send_message(
+                    "you're the runner of this run and also the server owner. are you sure you want to verify yourself?",
+                    view=prompt, ephemeral=True)
+                return
+            else:
+                await interaction.response.send_message("you can't verify your own run", ephemeral=True)
+                return
 
         if already:
             if is_owner:
@@ -700,6 +739,10 @@ class VerificationView(View):
         await _do_verify(thread, state, user.id, user.mention, bot_msg)
 
     async def _on_report(self, interaction: discord.Interaction):
+        state = _get_state(interaction.channel_id)
+        if state.get('state') in ('reported', 'manual'):
+            await interaction.response.send_message("this thread is locked for verification", ephemeral=True)
+            return
         user = interaction.user
         if not isinstance(user, discord.Member):
             user = interaction.guild.get_member(user.id)
@@ -767,16 +810,21 @@ class ReportResolveView(View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="resolve report", style=discord.ButtonStyle.primary, custom_id="v:resolve")
-    async def resolve_btn(self, interaction: discord.Interaction, button: Button):
+    async def _check_mod(self, interaction: discord.Interaction) -> bool:
         member = interaction.user
         if not isinstance(member, discord.Member):
             member = interaction.guild.get_member(member.id)
         mod_role = interaction.guild.get_role(MOD_ROLE_ID)
         if not mod_role or not member or mod_role not in member.roles:
-            if member and member.id != interaction.guild.owner_id:
+            if not member or member.id != interaction.guild.owner_id:
                 await interaction.response.send_message("you don't have permission to do that", ephemeral=True)
-                return
+                return False
+        return True
+
+    @discord.ui.button(label="resolve report", style=discord.ButtonStyle.primary, custom_id="v:resolve")
+    async def resolve_btn(self, interaction: discord.Interaction, button: Button):
+        if not await self._check_mod(interaction):
+            return
         state = _get_state(interaction.channel_id)
         state['state'] = 'verification'
         state['report_resolved'] = True
@@ -785,9 +833,86 @@ class ReportResolveView(View):
         remaining = state['verifiers_needed'] - state['verifiers_done']
         await _set_tags(thread, [TAG_NEEDS_VERIFICATION, _verifier_tag(remaining)])
         content = _build_challenge_message(state, interaction.guild)
-        view = VerificationView(remaining)
+        view = VerificationView(remaining, hide_change=state['verifiers_done'] > 0)
         await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping(), suppress=True)
         await thread.send(f"report resolved by {interaction.user.mention}", allowed_mentions=_no_ping())
+
+    @discord.ui.button(label="enter manual mode", style=discord.ButtonStyle.secondary, custom_id="v:manual:enter")
+    async def manual_btn(self, interaction: discord.Interaction, button: Button):
+        if not await self._check_mod(interaction):
+            return
+        state = _get_state(interaction.channel_id)
+        state['state'] = 'manual'
+        state['report_resolved'] = True
+        _save_state()
+        thread = interaction.channel
+        await _set_tags(thread, [TAG_NEEDS_VERIFICATION])
+        content = _build_challenge_message(state, interaction.guild)
+        await interaction.response.edit_message(content=content, view=ManualModeView(), allowed_mentions=_no_ping(), suppress=True)
+        await thread.send(f"manual mode activated by {interaction.user.mention}", allowed_mentions=_no_ping())
+
+
+class ManualModeView(View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    async def _check_mod(self, interaction: discord.Interaction) -> bool:
+        member = interaction.user
+        if not isinstance(member, discord.Member):
+            member = interaction.guild.get_member(member.id)
+        mod_role = interaction.guild.get_role(MOD_ROLE_ID)
+        if not mod_role or not member or mod_role not in member.roles:
+            if not member or member.id != interaction.guild.owner_id:
+                await interaction.response.send_message("you don't have permission to do that", ephemeral=True)
+                return False
+        return True
+
+    @discord.ui.button(label="exit manual mode", style=discord.ButtonStyle.secondary, custom_id="v:manual:exit")
+    async def exit_btn(self, interaction: discord.Interaction, button: Button):
+        if not await self._check_mod(interaction):
+            return
+        state = _get_state(interaction.channel_id)
+        state['state'] = 'verification'
+        state['report_resolved'] = True
+        _save_state()
+        thread = interaction.channel
+        remaining = state['verifiers_needed'] - state['verifiers_done']
+        await _set_tags(thread, [TAG_NEEDS_VERIFICATION, _verifier_tag(remaining)])
+        content = _build_challenge_message(state, interaction.guild)
+        view = VerificationView(remaining, hide_change=state['verifiers_done'] > 0)
+        await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping(), suppress=True)
+        await thread.send(f"manual mode ended by {interaction.user.mention}", allowed_mentions=_no_ping())
+
+    @discord.ui.button(label="mark verified (no roles)", style=discord.ButtonStyle.success, custom_id="v:manual:verify")
+    async def verify_no_roles_btn(self, interaction: discord.Interaction, button: Button):
+        if not await self._check_mod(interaction):
+            return
+        state = _get_state(interaction.channel_id)
+        thread = interaction.channel
+        await interaction.response.edit_message(content="# <:doors_trophy:1499481077272674456> this run is verified!", view=None, allowed_mentions=_no_ping())
+        await thread.send("this run has been verified without awarding roles", allowed_mentions=_no_ping())
+        await thread.edit(archived=True, locked=True)
+        _clean_state(thread.id)
+
+    @discord.ui.button(label="mark verified with roles", style=discord.ButtonStyle.primary, custom_id="v:manual:verify_roles")
+    async def verify_with_roles_btn(self, interaction: discord.Interaction, button: Button):
+        if not await self._check_mod(interaction):
+            return
+        state = _get_state(interaction.channel_id)
+        thread = interaction.channel
+        role_id = state['selected_role_id']
+        op_id = state['op_id']
+        state['state'] = 'verified'
+        _save_state()
+        await _set_tags(thread, [TAG_VERIFIED])
+        member = thread.guild.get_member(op_id)
+        if member and role_id:
+            async with RoleSession(member) as rs:
+                rs.add(role_id)
+        await interaction.response.edit_message(content="# <:doors_trophy:1499481077272674456> this run is verified!", view=None, allowed_mentions=_no_ping())
+        await thread.send("<:doors_trophy:1499481077272674456> this run has been verified!\n-# the roles were given automatically", allowed_mentions=_no_ping())
+        await thread.edit(archived=True, locked=True)
+        _clean_state(thread.id)
 
 
 # ── Polling ─────────────────────────────────────────────────────────────────
@@ -838,6 +963,7 @@ async def restore_sessions(client: discord.Client):
     client.add_view(ChallengeConfirmView())
     client.add_view(NoFootageView())
     client.add_view(VerificationView(2))
+    client.add_view(ManualModeView())
     client.add_view(ReportResolveView())
 
     guild = client.get_guild(config.TARGET_GUILD)
