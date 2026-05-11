@@ -1141,7 +1141,7 @@ async def r(ctx, start_id: int, end_id: int = None):
 @general.has_perms('owner')
 async def update(ctx):
     import subprocess
-    await ctx.send(':radio_button: pulling from git...')
+    msg = await ctx.send(':radio_button: pulling from git...')
     try:
         result = subprocess.run(
             ['git', 'pull'],
@@ -1150,15 +1150,18 @@ async def update(ctx):
             timeout=30
         )
         if result.returncode != 0:
-            return await ctx.send(f':warning: git pull failed\n```{result.stderr}```')
-        await ctx.send(f'```{result.stdout}```')
-        await ctx.send(f':radio_button: restarting bot...')
+            return await msg.edit(f':warning: git pull failed\n```{result.stderr}```')
+        res = result.stdout.splitlines()
+        for line in res:
+            res = f'{res}\n-# {line}'
+        await msg.edit(f':radio_button: pulled from git!```{res}```')
+        await msg.edit(f':radio_button: restarting bot...```{res}```')
         subprocess.Popen(['systemctl', 'restart', '--user', 'tcs-utils-dcbot'])
 
     except subprocess.TimeoutExpired:
-        await ctx.send(':x: git pull timed out')
+        await msg.edit(':x: git pull timed out')
     except Exception as e:
-        await ctx.send(f':x: error: ```{e}```')
+        await msg.edit(f':x: error: ```{e}```')
 
 
 @bot.command()
