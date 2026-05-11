@@ -296,11 +296,11 @@ _messages = {
         f"{emoji['leave_vc']} **{{member}}** left the third voice channel {{count}}"
     ],
 
-    "edit_vc": [f"{emoji['edit_g']} **{{member}}** set the voice channel's status to {{status}}"],
+    "edit_vc": [f"{emoji['edit_g']} **{{member}}** set the voice channel's status to **{{status}}**"],
     "edit_vc_clear": [f"{emoji['edit_g']} **{{member}}** cleared the voice channel's status"],
-    "edit_vc_2": [f"{emoji['edit_p']} **{{member}}** set the second voice channel's status to {{status}}"],
+    "edit_vc_2": [f"{emoji['edit_p']} **{{member}}** set the second voice channel's status to **{{status}}**"],
     "edit_vc_2_clear": [f"{emoji['edit_p']} **{{member}}** cleared the second voice channel's status"],
-    "edit_vc_3": [f"{emoji['edit_r']} **{{member}}** set the third voice channel's status to {{status}}"],
+    "edit_vc_3": [f"{emoji['edit_r']} **{{member}}** set the third voice channel's status to **{{status}}**"],
     "edit_vc_3_clear": [f"{emoji['edit_r']} **{{member}}** cleared the third voice channel's status"],
 
     "promotion": [

@@ -13,7 +13,7 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-15'
+version = 'v5.0.6-16'
 
 changelog = \
 f"""
@@ -1154,7 +1154,7 @@ async def update(ctx):
         res = result.stdout.splitlines()
         for line in res:
             res = f'{res}\n-# {line}'
-        await ctx.send(content=f':radio_button: pulled from git!{res}')
+        await ctx.send(content=f':radio_button: pulled from git!\n{res}')
         await ctx.send(content=f':radio_button: restarting bot...')
         subprocess.Popen(['systemctl', 'restart', '--user', 'tcs-utils-dcbot'])
 
@@ -1727,19 +1727,19 @@ async def create_challenge(
 @bot.event
 async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
     if entry.action.value == 192:
-        import json
-        print(json.dumps(entry._data, indent=4))
-        raw_changes = getattr(entry, "_changes", [])
         new_status = None
-        #old_status = None
-        print(raw_changes)
-        for change in raw_changes:
-            if change.get("key") == "status":
-                new_status = change.get("new_value")
-                #old_status = change.get("old_value")
-                break
+        try:
+            new_status = entry.changes.after.status
+        except AttributeError:
+            pass
+        if new_status is None:
+            raw = getattr(entry, '_data', None)
+            if raw:
+                options = raw.get('options') or {}
+                new_status = options.get('status')
+
         if entry._target_id == config.channels['vc']:
-            await general.send(config.message('edit_vc', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
+            await general.send(config.message('edit_vc', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none()) # <-- always says that new status is None
         elif entry._target_id == config.channels['vc2']:
             await general.send(config.message('edit_vc_2', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
         elif entry._target_id == config.channels['vc3']:
