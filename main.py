@@ -13,13 +13,12 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-8'
+version = 'v5.0.6-9'
 
 changelog = \
 f"""
 ## {version} changelog
-- add message in chat for changing the voice channels' status (FINALLY!!! jesus i wanted to add this for MONTHS bro)
-- changed the way the bot works when starting up
+- fix message in chat for changing the voice channels' status
 """
 
 ################################################################
@@ -52,7 +51,7 @@ async def on_ready():
     await msg.edit(content=f':radio_button: fetching role relations...')
     await role_management.load_role_relations(bot)
     #msg = await general.send(f'-# :eye: building up activity cache', 'mod_chat')
-    await msg.edit(content=f':green_circle: restart complete!\n{changelog}')
+    await msg.edit(content=f':green_circle: restart complete!{changelog}')
     await activity.build_activity_cache()
     #await msg.edit(content='-# :white_check_mark: done')
     if not member_checker.is_running():
@@ -1725,18 +1724,18 @@ async def create_challenge(
 @bot.event
 async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
     if entry.action.value == 192:
-        if entry.target.id == config.channels['vc']:
+        if entry._target_id == config.channels['vc']:
             await general.send(config.message('edit_vc', member=entry.user.mention, status=entry.changes.after))
-        elif entry.target.id == config.channels['vc2']:
+        elif entry._target_id == config.channels['vc2']:
             await general.send(config.message('edit_vc_2', member=entry.user.mention, status=entry.changes.after))
-        elif entry.target.id == config.channels['vc3']:
+        elif entry._target_id == config.channels['vc3']:
             await general.send(config.message('edit_vc_3', member=entry.user.mention, status=entry.changes.after))
     elif entry.action.value == 193:
-        if entry.target.id == config.channels['vc']:
+        if entry._target_id == config.channels['vc']:
             await general.send(config.message('edit_vc_clear', member=entry.user.mention))
-        elif entry.target.id == config.channels['vc2']:
+        elif entry._target_id == config.channels['vc2']:
             await general.send(config.message('edit_vc_2_clear', member=entry.user.mention))
-        elif entry.target.id == config.channels['vc3']:
+        elif entry._target_id == config.channels['vc3']:
             await general.send(config.message('edit_vc_3_clear', member=entry.user.mention))
 
 
