@@ -962,6 +962,7 @@ class RejectConfirmView(View):
         except:
             pass
         await thread.send(VM["reject_notify"].format(mention=interaction.user.mention))
+        await thread.edit(archived=True)
 
     @discord.ui.button(label=VM["btn_cancel"], style=discord.ButtonStyle.secondary)
     async def cancel_btn(self, interaction: discord.Interaction, button: Button):
@@ -1040,7 +1041,7 @@ class ManualModeView(View):
         role_mention = f"<@&{state['selected_role_id']}>" if state.get('selected_role_id') else "???"
         await interaction.response.edit_message(content=VM["verif_done_bot"].format(role_mention=role_mention), view=None, allowed_mentions=_no_ping())
         await thread.send(VM["manual_verify_no_roles"].format(role_mention=role_mention, mention=interaction.user.mention), allowed_mentions=_no_ping())
-        await thread.edit(archived=True, locked=True)
+        await thread.edit(archived=True)
         _clean_state(thread.id)
 
     @discord.ui.button(label=VM["btn_manual_verify_roles"], style=discord.ButtonStyle.primary, custom_id="v:manual:verify_roles")
@@ -1061,7 +1062,7 @@ class ManualModeView(View):
         role_mention = f"<@&{role_id}>" if role_id else "???"
         await interaction.response.edit_message(content=VM["verif_done_bot"].format(role_mention=role_mention), view=None, allowed_mentions=_no_ping())
         await thread.send(VM["manual_verify_roles"].format(role_mention=role_mention, mention=interaction.user.mention), allowed_mentions=_no_ping())
-        await thread.edit(archived=True, locked=True)
+        await thread.edit(archived=True)
         _clean_state(thread.id)
 
 
