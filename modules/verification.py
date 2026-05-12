@@ -30,6 +30,7 @@ TAG_2_NEEDED = 1502769166728429749
 TAG_1_NEEDED = 1502769259238133854
 TAG_REPORTED = 1502769374098882671
 TAG_VERIFIED = 1502769297498308669
+TAG_REJECTED = 1503659032890839150
 
 YOUTUBE_RE = re.compile(
     r'(?:https?://)?(?:www\.|m\.)?'
@@ -80,6 +81,7 @@ def _init_state(thread_id: int, op_id: int) -> dict:
         'report_resolved': False,
         'ignore': False,
         'no_footage': False,
+        'rejected': False,
         'verifier_pinged': False,
     }
     return _state[k]
@@ -213,7 +215,9 @@ def _build_challenge_message(state: dict, guild: discord.Guild) -> str:
     needed = state.get('verifiers_needed', 0)
     done = state.get('verifiers_done', 0)
 
-    if st == 'reported':
+    if st == 'rejected':
+        lines.append(VM["msg_body_rejected"])
+    elif st == 'reported':
         lines.append(VM["msg_body_reported"])
     elif st == 'manual':
         lines.append(VM["msg_body_manual"])
@@ -364,6 +368,10 @@ async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: d
             ]
             if state.get('video_url'):
                 final_lines.append(VM["msg_url_line"].format(url=state['video_url']))
+            verified_by = state.get('verified_by', [])
+            if verified_by:
+                verifier_mentions = ", ".join(f"<@{uid}>" for uid in verified_by)
+                final_lines.append(VM["msg_body_verified_by"].format(verifiers=verifier_mentions))
             final_lines.append("")
             final_lines.append(VM["verif_done_bot"].format(role_mention=role_mention))
             await bot_msg.edit(content="\n".join(final_lines), view=None, allowed_mentions=_no_ping())
@@ -731,6 +739,10 @@ class VerificationView(View):
             cbtn.callback = self._on_change
             self.add_item(cbtn)
 
+        rjbtn = Button(label=VM["btn_reject"], style=discord.ButtonStyle.danger, custom_id="v:reject", row=1)
+        rjbtn.callback = self._on_reject
+        self.add_item(rjbtn)
+
     async def _is_verifier(self, interaction: discord.Interaction) -> bool:
         member = interaction.user
         if not isinstance(member, discord.Member):
@@ -742,8 +754,11 @@ class VerificationView(View):
 
     async def _on_verify(self, interaction: discord.Interaction):
         state = _get_state(interaction.channel_id)
-        if state.get('state') in ('reported', 'manual'):
-            await interaction.response.send_message(VM["err_locked"], ephemeral=True)
+        if state.get('state') in ('reported', 'manual', 'rejected'):
+            if state.get('state') == 'rejected':
+                await interaction.response.send_message(VM["err_rejected"], ephemeral=True)
+            else:
+                await interaction.response.send_message(VM["err_locked"], ephemeral=True)
             return
         user = interaction.user
         if not isinstance(user, discord.Member):
@@ -792,9 +807,33 @@ class VerificationView(View):
 
         await _do_verify(thread, state, user.id, user.mention, bot_msg)
 
+    async def _on_reject(self, interaction: discord.Interaction):
+        state = _get_state(interaction.channel_id)
+        if state.get('state') in ('reported', 'manual', 'rejected'):
+            if state.get('state') == 'rejected':
+                await interaction.response.send_message(VM["err_rejected"], ephemeral=True)
+            else:
+                await interaction.response.send_message(VM["err_locked"], ephemeral=True)
+            return
+        user = interaction.user
+        if not isinstance(user, discord.Member):
+            user = interaction.guild.get_member(user.id)
+        has_role = await self._is_verifier(interaction)
+        is_owner = interaction.guild.owner_id == user.id if user else False
+
+        if not is_owner and not has_role:
+            await interaction.response.send_message(VM["err_not_verifier"], ephemeral=True)
+            return
+
+        await interaction.response.send_message(
+            VM["reject_prompt"],
+            view=RejectConfirmView(),
+            ephemeral=True,
+        )
+
     async def _on_report(self, interaction: discord.Interaction):
         state = _get_state(interaction.channel_id)
-        if state.get('state') in ('reported', 'manual'):
+        if state.get('state') in ('reported', 'manual', 'rejected'):
             await interaction.response.send_message(VM["err_locked"], ephemeral=True)
             return
         user = interaction.user
@@ -901,6 +940,64 @@ class ReportResolveView(View):
         content += VM["flow_manual_desc"]
         await interaction.response.edit_message(content=content, view=ManualModeView(), allowed_mentions=_no_ping())
         await thread.send(VM["manual_activated"].format(mention=interaction.user.mention), allowed_mentions=_no_ping())
+
+
+class RejectConfirmView(View):
+    def __init__(self):
+        super().__init__()
+
+    @discord.ui.button(label=VM["btn_reject"], style=discord.ButtonStyle.danger)
+    async def confirm_btn(self, interaction: discord.Interaction, button: Button):
+        state = _get_state(interaction.channel_id)
+        state['state'] = 'rejected'
+        state['rejected'] = True
+        _save_state()
+        thread = interaction.channel
+        await _set_tags(thread, [TAG_REJECTED])
+        content = _build_challenge_message(state, interaction.guild)
+        await interaction.response.edit_message(content=VM["info_proceeding"], view=None)
+        main_msg = thread.get_partial_message(state['message_id'])
+        try:
+            await main_msg.edit(content=content, view=RejectResolveView())
+        except:
+            pass
+        await thread.send(VM["reject_notify"].format(mention=interaction.user.mention))
+
+    @discord.ui.button(label=VM["btn_cancel"], style=discord.ButtonStyle.secondary)
+    async def cancel_btn(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.edit_message(content=VM["reject_cancelled"], view=None)
+
+
+class RejectResolveView(View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    async def _check_mod(self, interaction: discord.Interaction) -> bool:
+        member = interaction.user
+        if not isinstance(member, discord.Member):
+            member = interaction.guild.get_member(member.id)
+        mod_role = interaction.guild.get_role(MOD_ROLE_ID)
+        if not mod_role or not member or mod_role not in member.roles:
+            if not member or member.id != interaction.guild.owner_id:
+                await interaction.response.send_message(VM["err_not_verifier"], ephemeral=True)
+                return False
+        return True
+
+    @discord.ui.button(label=VM["btn_reinstate"], style=discord.ButtonStyle.primary, custom_id="v:reinstate")
+    async def reinstate_btn(self, interaction: discord.Interaction, button: Button):
+        if not await self._check_mod(interaction):
+            return
+        state = _get_state(interaction.channel_id)
+        state['state'] = 'verification'
+        state['rejected'] = False
+        _save_state()
+        thread = interaction.channel
+        remaining = state['verifiers_needed'] - state['verifiers_done']
+        await _set_tags(thread, [TAG_NEEDS_VERIFICATION, _verifier_tag(remaining)])
+        content = _build_challenge_message(state, interaction.guild)
+        view = VerificationView(remaining, hide_change=state['verifiers_done'] > 0)
+        await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping())
+        await thread.send(VM["rejected_resolved"].format(mention=interaction.user.mention), allowed_mentions=_no_ping())
 
 
 class ManualModeView(View):
@@ -1018,6 +1115,7 @@ async def restore_sessions(client: discord.Client):
     client.add_view(VerificationView(2))
     client.add_view(ManualModeView())
     client.add_view(ReportResolveView())
+    client.add_view(RejectResolveView())
 
     guild = client.get_guild(config.TARGET_GUILD)
     if not guild:

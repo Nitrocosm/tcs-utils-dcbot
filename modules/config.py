@@ -250,7 +250,7 @@ verification_messages = {
     "btn_next": "next >",
 
     # ── Main bot message (pinned) ──
-    "msg_header_title": "# {role_mention} completion",
+    "msg_header_title": "# <:doors_clock:1499578504000311386> {role_mention} completion",
     "msg_header_body": "{op_mention} completed **{name}**",
     "msg_body_reported": "## <:disconnect:1499465485144686682> reported - awaiting moderator review",
     "msg_body_manual": "## <:required:1463357222632292458> manual mode - only moderators can act",
@@ -297,6 +297,7 @@ verification_messages = {
     "info_cancelled": "verification cancelled",
     "err_role_not_found": "role not found",
     "err_invalid_challenge": "invalid challenge",
+    "err_rejected": "this run has been rejected and can no longer be verified",
 
     # ── Report flow ──
     "report_prompt": "# request moderation assistance\nthis will pause verifications and ping <@&{MOD_ROLE_ID}>.\na moderator will review the thread and decide what to do.\n\n**this doesn't mean the run is invalid or cheated.** it just means a human needs to look at it \u2014 for example:\n\u2022 the bot can't handle what's needed (e.g. awarding multiple roles)\n\u2022 the runner picked the wrong challenge and can't change it\n\u2022 anything else that requires assistance\n### are you sure you want to escalate?",
@@ -310,6 +311,18 @@ verification_messages = {
     "manual_exit": "{mention} ended manual mode",
     "manual_verify_no_roles": "<:doors_trophy:1499481077272674456> {role_mention} was marked as verified without awarding roles\n-# by {mention}",
     "manual_verify_roles": "<:doors_trophy:1499481077272674456> {role_mention} verified by {mention}\n-# the role was given automatically",
+
+    # ── Reject flow ──
+    "btn_reject": "reject run",
+    "btn_reinstate": "reinstate",
+    "reject_prompt": "# reject this run?\nthis will stop verifications and mark it as rejected.\na moderator will need to reinstate it before it can continue.\n### are you sure?",
+    "reject_cancelled": "rejection cancelled",
+    "reject_notify": "<:death:1454943637904425141> {mention} rejected this run",
+    "rejected_resolved": "<:doors_clock:1499578504000311386> {mention} reinstated the run",
+    "msg_body_rejected": "## <:no:1454950318042255410> run rejected",
+
+    # ── Verification completion ──
+    "msg_body_verified_by": "verified by {verifiers}",
 }
 
 def message(dict_key: str, **kwargs) -> str:
