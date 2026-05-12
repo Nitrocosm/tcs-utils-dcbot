@@ -259,7 +259,7 @@ verification_messages = {
     "msg_body_uploading": "## <:doors_globe:1499578536904622101> the video is uploading",
     "msg_body_uploading_check": "-# will ping the verifiers when the video is ready\n-# next check: <t:{ts}:R>",
     "msg_body_uploading_hint": "",
-    "msg_body_no_video": "## <:not_applicable:1500106312560672912> waiting for a youtube link",
+    "msg_body_no_video": "## <:not_applicable:1500106312560672912> waiting for a youtube link\n-# send a link! make sure the video isn't private and is either unlisted or public",
     "msg_body_no_footage": "## <:no:1454950318042255410> no footage or other platform",
     "msg_body_no_video_hint": "edit your post or paste a youtube link in this chat",
     "msg_url_line": "-# {url}",
