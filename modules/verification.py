@@ -734,14 +734,14 @@ class VerificationView(View):
         rbtn.callback = self._on_report
         self.add_item(rbtn)
 
-        if not hide_change:
-            cbtn = Button(label=VM["btn_change"], style=discord.ButtonStyle.secondary, custom_id="v:ver:change")
-            cbtn.callback = self._on_change
-            self.add_item(cbtn)
-
-        rjbtn = Button(label=VM["btn_reject"], style=discord.ButtonStyle.danger, custom_id="v:reject", row=1)
+        rjbtn = Button(label=VM["btn_reject"], style=discord.ButtonStyle.danger, custom_id="v:reject")
         rjbtn.callback = self._on_reject
         self.add_item(rjbtn)
+
+        if not hide_change:
+            cbtn = Button(label=VM["btn_change"], style=discord.ButtonStyle.secondary, custom_id="v:ver:change", row=1)
+            cbtn.callback = self._on_change
+            self.add_item(cbtn)
 
     async def _is_verifier(self, interaction: discord.Interaction) -> bool:
         member = interaction.user
