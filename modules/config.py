@@ -218,144 +218,96 @@ emoji = {
 }
 
 _messages = {
-    "join": [
-        f"{emoji['join']} {{mention}}, are you ready for the pain?",
-        f"{emoji['join']} {{mention}} should now prepare to die in the backdoor a hundred times",
-        f"{emoji['join']} heya, {{mention}}, welcome! mind you, this entire server is a safespot",
-        f"{emoji['join']} it's time for {{mention}} to acknowledge the possibility of pain and seizure",
-        f"{emoji['join']} {{mention}} just joined! quick, everyone look like we know what we're doing!",
-        f"{emoji['join']} uhh, hey, {{mention}}, you have any sanity? We're running low, could we please borrow some?",
-        f"{emoji['join']} let's hope {{mention}} has it all Figured out"
-    ],
-    "join_bot": [
-        f"{emoji['app_join']} someone added a clanker who goes by {{mention}}",
-        f"{emoji['app_join']} i think {{mention}} just hacked us",
-        f"{emoji['app_join']} {{mention}} computed its way in"
-    ],
-    "leave": [
-        f"{emoji['leave']} {{mention}} ({{display}}) couldn't handle The Backdoor any longer...",
-        f"{emoji['leave']} {{mention}} ({{display}}) disconnected. Please check your internet connection and try again. (Error Code: 277)",
-        f"{emoji['leave']} {{mention}} ({{display}}) ran out of crucifixes, I guess...",
-        f"{emoji['leave']} {{mention}} ({{display}}) ragequit",
-        f"{emoji['leave']} {{mention}} ({{display}}) saw the light. it was outside. outside this server. they're happier now",
-        f"{emoji['leave']} well off {{mention}} ({{display}}) goes ig"
-    ],
-    "kick": [
-        f"{emoji['kick']} {{mention}} ({{display}}) was kicked from this experience (Error Code: 267)",
-        f"{emoji['kick']} {{mention}} ({{display}}) slipped on a nanner peel placed by a mod and fell out of bounds",
-        f"{emoji['kick']} an mod's mighty foot sent {{mention}} ({{display}}) flying. a reminder that you shouldn't fly during the challenge, that's cheating",
-        f"{emoji['kick']} {{mention}} ({{display}}) got electrocuted. not by surge, though",
-        f"{emoji['kick']} {{mention}} ({{display}}) got Figured out. by a mod."
-    ],
-    "ban": [
-        f"{emoji['ban']} {{mention}} ({{display}}) got banned (ay yo)",
-        f"{emoji['ban']} {{mention}} ({{display}}) was kicked from this experience: You have been permanently blacklisted from This Challenge Sucks (Error Code: 267)",
-        f"{emoji['ban']} a mod got very angry and decided to ban {{mention}} ({{display}})"
-    ],
-    "kick_bot": [
-        f"{emoji['app_leave']} well off {{mention}} goes ig",
-        f"{emoji['app_leave']} bot {{mention}} was removed",
-        f"{emoji['app_leave']} {{mention}} got disconnected"
-    ],
-    "spoiler_add": [f"{emoji['join']} {{mention}} joined the spoilers channel"],
-    "spoiler_remove": [f"{emoji['kick']} {{mention}} is no longer in the spoilers channel"],
+    ...
+}
 
-    "available": [f"{emoji['available']} **{{name}}** is now available {{available_count}}"],
-    "available_ping": [f"{emoji['available']} **{{name}}** is now available {{available_count}} *<@&{roles['available']}>*"],
+verification_messages = {
+    # ── Button labels ──
+    "btn_verify": "verify ({needed} more)",
+    "btn_request_mod": "lock & request mod",
+    "btn_change": "change challenge",
+    "btn_official": "official challenge",
+    "btn_custom": "custom challenge",
+    "btn_joke": "joke badge",
+    "btn_fail": "this is a failed or incomplete run",
+    "btn_reopen": "make this a verification request",
+    "btn_tab_official": "official challenge",
+    "btn_tab_custom": "custom challenge",
+    "btn_tab_joke": "joke badge",
+    "btn_no_footage": "no footage / other platform",
+    "btn_verify_anyway": "yes, verify anyway",
+    "btn_verify_self": "yes, i'm sure, verify anyway",
+    "btn_cancel": "cancel",
+    "btn_escalate": "yes, escalate",
+    "btn_resolve": "resolve report",
+    "btn_manual_enter": "enter manual mode",
+    "btn_manual_exit": "exit manual mode",
+    "btn_manual_verify_no_roles": "mark verified & don't give roles",
+    "btn_manual_verify_roles": "mark verified as usual",
+    "select_placeholder": "select a challenge...",
+    "no_challenges": "no challenges available",
+    "btn_prev": "\u25c0 prev",
+    "btn_next": "next \u25b6",
 
-    "unavailable": [f"{emoji['unavailable']} **{{name}}** is no longer available {{available_count}}"],
-    "unavailable_ping": [f"{emoji['unavailable']} **{{name}}** is no longer available {{available_count}} *(we still have 8 tho)*"],
-    "unavailable_auto": [f"{emoji['unavailable']} **{{name}}** was marked unavailable by mods {{available_count}}"],
-    "unavailable_auto_bot": [f"{emoji['unavailable']} **{{name}}** was marked unavailable automatically (no activity in past 1.5 hrs) {{available_count}}"],
+    # ── Main bot message (pinned) ──
+    "msg_header": "# {role_mention}\n{op_mention} completed **{name}**",
+    "msg_body_reported": "## <:disconnect:1499465485144686682> reported - awaiting moderator review",
+    "msg_body_manual": "## <:required:1463357222632292458> manual mode - only moderators can act",
+    "msg_body_ready": "## <:yes:1463357188964618413> video is ready // `{done}/{needed}` verifications",
+    "msg_body_ready_last": "-# last verifier: {last}",
+    "msg_body_uploading": "## <:doors_globe:1499578536904622101> the video is uploading",
+    "msg_body_uploading_check": "-# will ping the verifiers when the video is ready\n-# next check: <t:{ts}:R>",
+    "msg_body_uploading_hint": "",
+    "msg_body_no_video": "## <:not_applicable:1500106312560672912> waiting for a youtube link",
+    "msg_body_no_video_hint": "edit your post or paste a youtube link in this chat",
+    "msg_url_line": "-# {url}",
 
-    "join_vc": [f"{emoji['join_vc']} **{{member}}** joined the first voice channel {{count}}"],
-    "leave_vc": [f"{emoji['leave_vc']} **{{member}}** left the first voice channel {{count}}"],
-    "join_vc_2": [f"{emoji['join_vc_2']} **{{member}}** joined the second voice channel {{count}}"],
-    "leave_vc_2": [f"{emoji['leave_vc']} **{{member}}** left the second voice channel {{count}}"],
-    "join_vc_3": [f"{emoji['join_vc_3']} **{{member}}** joined the third voice channel {{count}}"],
-    "leave_vc_3": [f"{emoji['leave_vc']} **{{member}}** left the third voice channel {{count}}"],
+    # ── Flow messages ──
+    "flow_start": "# <@{op_id}>, what challenge did you complete?\nselect a category below",
+    "flow_pick_category": "# {op_mention}, what challenge did you complete?\nselect a category below",
+    "flow_pick_challenge": "# pick a challenge\nuse the dropdown to select the one you completed",
+    "flow_ignore": "# <:disconnect:1499465485144686682> this thread is marked as incomplete or failed\nthe runner stated this is a failed or incomplete run.\nif this changes, click the button below to turn it back into a verification request.",
+    "flow_ask_video": "<@{op_id}> **the bot only supports youtube links.**\nedit your original post to add one, or paste a link in this chat.\n***by the way, you can send the link even before it's finished uploading! the bot will ping the verifiers when it's watchable automatically.***\nif you don't have footage or are using another platform, click below to skip the youtube requirement.",
+    "flow_manual_desc": "\n\n<:required:1463357222632292458> **manual mode** - only moderators can interact with the buttons below. use them to resolve this thread.",
 
-    "join_vc_force": [f"{emoji['join_vc']} fixed **{{member}}**'s vc roles: joined the first voice channel {{count}}"],
-    "leave_vc_force": [f"{emoji['leave_vc']} fixed **{{member}}**'s vc roles: left the first voice channel {{count}}"],
-    "join_vc_2_force": [f"{emoji['join_vc_2']} fixed **{{member}}**'s vc roles: joined the second voice channel {{count}}"],
-    "leave_vc_2_force": [f"{emoji['leave_vc']} fixed **{{member}}**'s vc roles: left the second voice channel {{count}}"],
-    "join_vc_3_force": [f"{emoji['join_vc_3']} fixed **{{member}}**'s vc roles: joined the third voice channel {{count}}"],
-    "leave_vc_3_force": [f"{emoji['leave_vc']} fixed **{{member}}**'s vc roles: left the third voice channel {{count}}"],
+    # ── Verification event messages ──
+    "verif_ping": "## <:required:1463357222632292458> <@&{VERIFIER_ROLE_ID}> new **{name}** completion!\n-# after watching the video click \"verify\" on the pinned message above\n-# if something needs a moderator, click \"request mod\" instead\n-# make sure the correct challenge is selected",
+    "verif_in_progress": "<:yes:1463357188964618413> verified by {mention} // `{remaining}` more needed",
+    "verif_complete": "<:yes:1463357188964618413> verified by {mention} // run is verified!",
+    "verif_done_bot": "# <:doors_trophy:1499481077272674456> this {role_mention} completion is verified!",
+    "verif_done_thread": "<:doors_trophy:1499481077272674456> {role_mention} finished verification!\n-# the role was given automatically\n-# the bot doesn't do <#1427066908812906526> posts yet, if one needs to be done - do it",
 
-    "edit_vc": [f"{emoji['edit_g']} **{{member}}** set the first voice channel's status to **{{status}}**"],
-    "edit_vc_no_status": [f"{emoji['edit_g']} **{{member}}** changed the first voice channel's status"],
-    "edit_vc_clear": [f"{emoji['edit_g']} **{{member}}** cleared the first voice channel's status"],
-    "edit_vc_2": [f"{emoji['edit_p']} **{{member}}** set the second voice channel's status to **{{status}}**"],
-    "edit_vc_2_no_status": [f"{emoji['edit_p']} **{{member}}** changed the second voice channel's status"],
-    "edit_vc_2_clear": [f"{emoji['edit_p']} **{{member}}** cleared the second voice channel's status"],
-    "edit_vc_3": [f"{emoji['edit_r']} **{{member}}** set the third voice channel's status to **{{status}}**"],
-    "edit_vc_3_no_status": [f"{emoji['edit_r']} **{{member}}** changed the third voice channel's status"],
-    "edit_vc_3_clear": [f"{emoji['edit_r']} **{{member}}** cleared the third voice channel's status"],
+    # ── Owner override / verification prompts ──
+    "prompt_self_verify_owner": "you're the runner of this run **and** the server owner.\nare you sure you want to verify yourself?",
+    "prompt_redo_owner": "you already verified this run. are you sure you want to do it again?",
+    "prompt_owner_no_role": "you don't have the verifier role. are you sure you want to verify this run?",
 
-    "promotion": [
-        f"{emoji['promotion']} {{mention}} is now a moderator!"
-    ],
-    "demotion": [
-        f"{emoji['demotion']} {{mention}} was demoted..."
-    ],
-    "new_leader": [
-        f"{emoji['promotion']} {{mention}} is now a leader!"
-    ],
-    "leader_removed": [
-        f"{emoji['demotion']} {{mention}} is no longer a leader..."
-    ],
-    "promotion_welcome": [
-        f"{emoji['promotion']} welcome, {{mention}}. hope this chat is cozy!"
-    ],
-    "demotion_goodbye": [
-        f"{emoji['demotion']} {{mention}} wasn't worthy of being a mod, it seems. well, off you go"
-    ],
-    "name_change": [
-        f"{emoji['edit']} {{mention}}'s name was changed from **{{old_name}}** to **{{new_name}}**"
-    ],
-    "birthday": [
-        f"{emoji['birthday']} happy birthday, {{mention}}!!"
-    ],
-    "newbie": [
-        f"{emoji['newbie']} {{mention}} is not a newbie anymore!! please applaud!!"
-    ],
-    "inactive": [
-        f"{emoji['inactive']} {{mention}} didn't send a single message in chat in the past 6 days so marked inactive automatically"
-    ],
-    "inactive_mods": [
-        f"{emoji['inactive']} mods marked {{mention}} inactive"
-    ],
-    "inactive_revoke": [
-        f"{emoji['inactive_revoke']} {{mention}} is no longer considered inactive!"
-    ],
-    "explained_inactive": [
-        f"{emoji['explained_inactive']} {{mention}}'s inactivity was excused"
-    ],
-    "nuh_uh": [
-        "https://cdn.discordapp.com/attachments/715528165132599337/1442162843452440777/nuh-uh-3d-thumbnail-url-7g84og.png?ex=69246e4f&is=69231ccf&hm=b1bf1bb44ee89017d8404d35a1b0812eef3c6dc29a870ef3a8fefaa96fc7353e&",
-    ],
-    "bot_doesnt_have_perms": [
-        "https://cdn.discordapp.com/attachments/715528165132599337/1442288380766457977/artworks-000519533403-ovb003-t1080x1080.png?ex=6924e33a&is=692391ba&hm=1ce891ca81be59241658390d96198e442226d78d4b4c7e708a28f5355f6ac5bb&"
-    ],
-    "wip": [
-        "https://media.discordapp.net/attachments/715528165132599337/1450116115190513795/pug-dog-constructor-safety-helmet-yellow-black-work-progress-sign-wooden-pole-isolated-white-background-92995840.png?ex=69415d5f&is=69400bdf&hm=95a383c0b59ff99f483df65c5ab5d0b44e8628c786b847e75246b557447eb0fb&=&format=webp&quality=lossless"
-    ],
-    "channel_lock": [
-        "🔒 channel was locked"
-    ],
-    "channel_unlock": [
-        "🔓 channel was unlocked"
-    ],
-    "rp_kill": [f"{emoji['knife']} {{author}} brutally murdered {{target}}"],
-    "rp_hug": [f"{emoji['hug']} {{author}} hugged {{target}}"],
-    "rp_kiss": [f"{emoji['kiss']} {{author}} kissed {{target}}"],
-    "rp_high_five": [f"{emoji['high_five']} {{author}} gave a high five to {{target}}"],
-    "rp_handshake": [f"{emoji['handshake']} {{author}} shook hands with {{target}}"],
-    "rp_burn": [f"{emoji['fire']} {{author}} set {{target}} on fire"],
-    "rp_punch": [f"{emoji['punch']} {{author}} punched {{target}}"],
-    "rp_slap": [f"{emoji['slap']} {{author}} slapped {{target}}"],
-    "rp_pat": [f"{emoji['pat']} {{author}} patted {{target}} on the head"],
-    "rp_touch": [f"{emoji['touch']} {{author}} touched {{target}}"],
+    # ── Ephemeral error / info messages ──
+    "err_not_verifier": "you don't have permission to do that",
+    "err_not_op": "this isn't for you",
+    "err_no_identity": "could not verify identity",
+    "err_locked": "this thread is locked for verification",
+    "err_self_verify": "you can't verify your own run",
+    "err_already_done": "you already verified this run",
+    "err_cant_change": "can't change challenge after a verification has happened",
+    "err_no_bot_msg": "could not find the verification message",
+    "info_proceeding": "proceeding...",
+    "info_cancelled": "verification cancelled",
+    "err_role_not_found": "role not found",
+    "err_invalid_challenge": "invalid challenge",
+
+    # ── Report flow ──
+    "report_prompt": "# request moderation assistance\nthis will pause verifications and ping <@&{MOD_ROLE_ID}>.\na moderator will review the thread and decide what to do.\n\n**this doesn't mean the run is invalid or cheated.** it just means a human needs to look at it \u2014 for example:\n\u2022 the bot can't handle what's needed (e.g. awarding multiple roles)\n\u2022 the runner picked the wrong challenge and can't change it\n\u2022 anything else that requires assistance\n### are you sure you want to escalate?",
+    "report_escalated": "# run escalated to moderators",
+    "report_notify": "<:restricted:1500105022166536292> <@&{MOD_ROLE_ID}> this needs mod assistance",
+    "report_cancelled": "report cancelled",
+    "report_resolved": "<:yes:1463357188964618413> {mention} resolved the report",
+
+    # ── Manual mode ──
+    "manual_activated": "<:doors_lock:1499468754378297645> {mention} activated manual mode",
+    "manual_exit": "{mention} ended manual mode",
+    "manual_verify_no_roles": "<:doors_trophy:1499481077272674456> {role_mention} was marked as verified without awarding roles\n-# by {mention}",
+    "manual_verify_roles": "<:doors_trophy:1499481077272674456> {role_mention} verified by {mention}\n-# the role was given automatically",
 }
 
 def message(dict_key: str, **kwargs) -> str:

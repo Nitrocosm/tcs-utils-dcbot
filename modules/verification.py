@@ -15,6 +15,8 @@ from modules.points import parse_challenge_role
 from modules.role_management import RoleSession
 from modules.badges import badge_emoji_for_name as _badge_emoji
 
+VM = config.verification_messages
+
 VERIFICATION_FORUM_ID = 1502768684085678200
 STATE_FILE = 'verification_state.json'
 
@@ -191,43 +193,46 @@ def _verifier_tag(count: int) -> int:
     return {3: TAG_3_NEEDED, 2: TAG_2_NEEDED, 1: TAG_1_NEEDED}.get(count, TAG_3_NEEDED)
 
 def _build_challenge_message(state: dict, guild: discord.Guild) -> str:
+    VM = config.verification_messages
     role_id = state.get('selected_role_id')
     op_id = state.get('op_id')
     role = guild.get_role(role_id) if role_id else None
     info = parse_challenge_role(role) if role else None
-    name = info['name'] if info else "Unknown"
+    name = info['name'] if info else "???"
     role_mention = f"<@&{role_id}>" if role_id else "???"
     op_mention = f"<@{op_id}>"
     st = state.get('state', '')
 
-    lines = [f"# {role_mention} — {op_mention}", f"{op_mention} completed {name}"]
+    lines = [
+        VM["msg_header"].format(role_mention=role_mention, op_mention=op_mention, name=name),
+    ]
 
     video_url = state.get('video_url')
     needed = state.get('verifiers_needed', 0)
     done = state.get('verifiers_done', 0)
 
     if st == 'reported':
-        lines.append("<:disconnect:1499465485144686682> reported — awaiting moderator review")
+        lines.append(VM["msg_body_reported"])
     elif st == 'manual':
-        lines.append("<:required:1463357222632292458> manual mode — only moderators can act")
+        lines.append(VM["msg_body_manual"])
     elif video_url and state.get('video_ready'):
-        lines.append(f"<:yes:1463357188964618413> video is ready · `{done}/{needed}` verifications")
+        lines.append(VM["msg_body_ready"].format(done=done, needed=needed))
         last = state.get('last_verifier')
         if last:
-            lines.append(f"-# last verifier: {last}")
+            lines.append(VM["msg_body_ready_last"].format(last=last))
     elif video_url:
-        lines.append(f"<:doors_globe:1499578536904622101> the video is uploading")
+        lines.append(VM["msg_body_uploading"])
         nxt = state.get('next_check_at')
         if nxt:
-            lines.append(f"-# next check: <t:{nxt}:R>")
-        lines.append(f"-# you can still send or edit your link")
+            lines.append(VM["msg_body_uploading_check"].format(ts=nxt))
+        lines.append(VM["msg_body_uploading_hint"])
     else:
-        lines.append("waiting for a youtube link")
+        lines.append(VM["msg_body_no_video"])
         if st == 'awaiting_video':
-            lines.append("edit your starter post or paste a youtube link in this chat")
+            lines.append(VM["msg_body_no_video_hint"])
 
     if video_url:
-        lines.append(f"-# {video_url}")
+        lines.append(VM["msg_url_line"].format(url=video_url))
 
     return "\n".join(lines)
 
@@ -239,6 +244,7 @@ def _no_ping():
 _NONCE_SEPARATOR = "::vnonce::"
 
 async def _do_verify(thread: discord.Thread, state: dict, user_id: int, mention: str, bot_msg: discord.Message):
+    VM = config.verification_messages
     role_mention = f"<@&{state['selected_role_id']}>" if state.get('selected_role_id') else "???"
     if user_id not in state['verified_by']:
         state['verified_by'].append(user_id)
@@ -246,11 +252,11 @@ async def _do_verify(thread: discord.Thread, state: dict, user_id: int, mention:
     state['last_verifier'] = mention
     remaining = state['verifiers_needed'] - state['verifiers_done']
     if remaining <= 0:
-        await thread.send(f"<:yes:1463357188964618413> {role_mention} verified by {mention} — fully verified!", allowed_mentions=_no_ping())
+        await thread.send(VM["verif_complete"].format(role_mention=role_mention, mention=mention), allowed_mentions=_no_ping())
         await _complete_verification(thread, state, bot_msg)
         return
     _save_state()
-    await thread.send(f"<:yes:1463357188964618413> {role_mention} verified by {mention} · `{remaining}` more needed", allowed_mentions=_no_ping())
+    await thread.send(VM["verif_in_progress"].format(role_mention=role_mention, mention=mention, remaining=remaining), allowed_mentions=_no_ping())
     await _set_tags(thread, [TAG_NEEDS_VERIFICATION, _verifier_tag(remaining)])
     content = _build_challenge_message(state, thread.guild)
     await bot_msg.edit(content=content, view=VerificationView(remaining, hide_change=state['verifiers_done'] > 0), suppress=True)
@@ -258,9 +264,10 @@ async def _do_verify(thread: discord.Thread, state: dict, user_id: int, mention:
 # ── Flow functions ──────────────────────────────────────────────────────────
 
 async def start_verification_flow(thread: discord.Thread):
+    VM = config.verification_messages
     s = _init_state(thread.id, thread.owner_id)
     view = ChallengeCategoryView()
-    msg = await thread.send(f"# verified challenge run\n<@{thread.owner_id}> what challenge did you complete? select a category below", view=view)
+    msg = await thread.send(VM["flow_start"].format(op_id=thread.owner_id), view=view)
     s['message_id'] = msg.id
     _save_state()
 
@@ -283,9 +290,10 @@ async def _handle_video_check(starter_msg: discord.Message, thread: discord.Thre
     await _process_video(video_id, thread, state, bot_msg)
 
 async def _ask_for_video(thread: discord.Thread, state: dict, bot_msg: discord.Message):
+    VM = config.verification_messages
     op_id = state['op_id']
     content = _build_challenge_message(state, thread.guild)
-    content += f"\n\n<@{op_id}> **the bot only supports youtube links.**\nedit your original post to add one, or paste a link in this chat.\nif you don't have footage or are using another platform, click below to skip the youtube requirement."
+    content += "\n\n" + VM["flow_ask_video"].format(op_id=op_id)
     view = NoFootageView()
     await bot_msg.edit(content=content, view=view, allowed_mentions=_no_ping())
     state['state'] = 'awaiting_video'
@@ -309,6 +317,7 @@ async def _process_video(video_id: str, thread: discord.Thread, state: dict, bot
             video_polling_loop.start()
 
 async def _enter_verification_phase(thread: discord.Thread, state: dict, bot_msg: discord.Message):
+    VM = config.verification_messages
     needed = state['verifiers_needed']
     state['state'] = 'verification'
     _save_state()
@@ -322,13 +331,11 @@ async def _enter_verification_phase(thread: discord.Thread, state: dict, bot_msg
         _save_state()
         role = thread.guild.get_role(state['selected_role_id']) if state.get('selected_role_id') else None
         info = parse_challenge_role(role) if role else None
-        name = info['name'] if info else "Unknown"
-        await thread.send(f"<:required:1463357222632292458> <@&{VERIFIER_ROLE_ID}> **{name}** — new verification request!\n"
-                          f"-# watch the video → click \"verify\" on the pinned message above\n"
-                          f"-# if something needs a moderator, click \"request mod\" instead\n"
-                          f"-# make sure the correct challenge is selected\n")
+        name = info['name'] if info else "???"
+        await thread.send(VM["verif_ping"].format(name=name, VERIFIER_ROLE_ID=VERIFIER_ROLE_ID), allowed_mentions=_no_ping())
 
 async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: discord.Message = None):
+    VM = config.verification_messages
     state['state'] = 'verified'
     role_id = state['selected_role_id']
     op_id = state['op_id']
@@ -340,10 +347,10 @@ async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: d
             rs.add(role_id)
     role_mention = f"<@&{role_id}>" if role_id else "???"
     last = state.get('last_verifier', 'someone')
-    await thread.send(f"<:doors_trophy:1499481077272674456> {role_mention} verified by {last}\n-# the role was given automatically", allowed_mentions=_no_ping())
+    await thread.send(VM["verif_done_thread"].format(role_mention=role_mention, last=last), allowed_mentions=_no_ping())
     if bot_msg:
         try:
-            await bot_msg.edit(content=f"# <:doors_trophy:1499481077272674456> {role_mention} is verified!", view=None, allowed_mentions=_no_ping())
+            await bot_msg.edit(content=VM["verif_done_bot"].format(role_mention=role_mention), view=None, allowed_mentions=_no_ping())
         except:
             pass
     await thread.edit(archived=True, locked=False)
@@ -414,7 +421,7 @@ class ChallengeCategoryView(View):
 
     async def _handle_category(self, interaction: discord.Interaction, category: str):
         if not await self._is_op(interaction):
-            await interaction.response.send_message("this isn't for you", ephemeral=True)
+            await interaction.response.send_message(VM["err_not_op"], ephemeral=True)
             return
         state = _get_state(interaction.channel_id)
         state['selected_category'] = category
@@ -424,24 +431,24 @@ class ChallengeCategoryView(View):
         official, custom, joke = _get_challenge_roles(interaction.guild)
         roles = {'official': official, 'custom': custom, 'joke': joke}[category]
         view = ChallengeMenuView(category, roles, 0, interaction.guild)
-        await interaction.response.edit_message(content="# pick a challenge\nuse the dropdown to select the one you completed", view=view)
+        await interaction.response.edit_message(content=VM["flow_pick_challenge"], view=view)
 
-    @discord.ui.button(label="official challenge", style=discord.ButtonStyle.secondary, custom_id="v:cat:off")
+    @discord.ui.button(label=VM["btn_official"], style=discord.ButtonStyle.secondary, custom_id="v:cat:off")
     async def official_btn(self, interaction: discord.Interaction, button: Button):
         await self._handle_category(interaction, 'official')
 
-    @discord.ui.button(label="custom challenge", style=discord.ButtonStyle.secondary, custom_id="v:cat:cust")
+    @discord.ui.button(label=VM["btn_custom"], style=discord.ButtonStyle.secondary, custom_id="v:cat:cust")
     async def custom_btn(self, interaction: discord.Interaction, button: Button):
         await self._handle_category(interaction, 'custom')
 
-    @discord.ui.button(label="joke badge", style=discord.ButtonStyle.secondary, custom_id="v:cat:joke")
+    @discord.ui.button(label=VM["btn_joke"], style=discord.ButtonStyle.secondary, custom_id="v:cat:joke")
     async def joke_btn(self, interaction: discord.Interaction, button: Button):
         await self._handle_category(interaction, 'joke')
 
-    @discord.ui.button(label="this is a failed or incomplete run", style=discord.ButtonStyle.danger, custom_id="v:cat:fail", row=1)
+    @discord.ui.button(label=VM["btn_fail"], style=discord.ButtonStyle.danger, custom_id="v:cat:fail", row=1)
     async def fail_btn(self, interaction: discord.Interaction, button: Button):
         if not await self._is_op(interaction):
-            await interaction.response.send_message("this isn't for you", ephemeral=True)
+            await interaction.response.send_message(VM["err_not_op"], ephemeral=True)
             return
         state = _get_state(interaction.channel_id)
         state['state'] = 'ignore'
@@ -449,9 +456,7 @@ class ChallengeCategoryView(View):
         _save_state()
         view = ReopenView()
         await interaction.response.edit_message(
-            content="# <:disconnect:1499465485144686682> this thread is marked as incomplete\n"
-                    "the runner stated this is a failed or incomplete run.\n"
-                    "if this changes, click the button below to turn it back into a verification request.",
+            content=VM["flow_ignore"],
             view=view,
             allowed_mentions=_no_ping(),
         )
@@ -461,18 +466,18 @@ class ReopenView(View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="make this a verification request", style=discord.ButtonStyle.primary, custom_id="v:reopen")
+    @discord.ui.button(label=VM["btn_reopen"], style=discord.ButtonStyle.primary, custom_id="v:reopen")
     async def reopen_btn(self, interaction: discord.Interaction, button: Button):
         state = _get_state(interaction.channel_id)
         if interaction.user.id != state['op_id']:
-            await interaction.response.send_message("this isn't for you", ephemeral=True)
+            await interaction.response.send_message(VM["err_not_op"], ephemeral=True)
             return
         state['state'] = 'choose_category'
         state['ignore'] = False
         _save_state()
         view = ChallengeCategoryView()
         await interaction.response.edit_message(
-            content=f"# <@{state['op_id']}>, what challenge did you complete?\nselect a category below",
+            content=VM["flow_pick_category"].format(op_mention=f"<@{state['op_id']}>"),
             view=view,
         )
 
@@ -487,9 +492,9 @@ class ChallengeMenuView(View):
         self.guild = guild
 
         for cat, label, cid in [
-            ('official', 'official challenge', 'v:tab:off'),
-            ('custom', 'custom challenge', 'v:tab:cust'),
-            ('joke', 'joke badge', 'v:tab:joke'),
+            ('official', VM["btn_tab_official"], 'v:tab:off'),
+            ('custom', VM["btn_tab_custom"], 'v:tab:cust'),
+            ('joke', VM["btn_tab_joke"], 'v:tab:joke'),
         ]:
             disabled = (cat == category)
             btn = Button(label=label, style=discord.ButtonStyle.secondary, disabled=disabled, custom_id=cid, row=0)
@@ -507,15 +512,15 @@ class ChallengeMenuView(View):
             emoji = _select_emoji_for_challenge(guild, info['name'], info['points']) if guild else None
             options.append(discord.SelectOption(label=label, value=str(role.id), emoji=emoji))
         if not options:
-            options.append(discord.SelectOption(label="no challenges available", value="none"))
-        select = Select(placeholder="select a challenge...", options=options, custom_id="v:menu")
+            options.append(discord.SelectOption(label=VM["no_challenges"], value="none"))
+        select = Select(placeholder=VM["select_placeholder"], options=options, custom_id="v:menu")
         select.callback = self._on_select
         self.add_item(select)
 
         total_pages = max(1, -(-len(roles) // per_page))
         if total_pages > 1:
-            prev_b = Button(label="\u25c0 prev", style=discord.ButtonStyle.secondary, disabled=page == 0, custom_id="v:prev", row=2)
-            next_b = Button(label="next \u25b6", style=discord.ButtonStyle.secondary, disabled=page >= total_pages - 1, custom_id="v:next", row=2)
+            prev_b = Button(label=VM["btn_prev"], style=discord.ButtonStyle.secondary, disabled=page == 0, custom_id="v:prev", row=2)
+            next_b = Button(label=VM["btn_next"], style=discord.ButtonStyle.secondary, disabled=page >= total_pages - 1, custom_id="v:next", row=2)
             prev_b.callback = self._make_page_cb(-1)
             next_b.callback = self._make_page_cb(1)
             self.add_item(prev_b)
@@ -525,21 +530,21 @@ class ChallengeMenuView(View):
         async def cb(interaction: discord.Interaction):
             state = _get_state(interaction.channel_id)
             if interaction.user.id != state['op_id']:
-                await interaction.response.send_message("this isn't for you", ephemeral=True)
+                await interaction.response.send_message(VM["err_not_op"], ephemeral=True)
                 return
             official, custom, joke = _get_challenge_roles(interaction.guild)
             roles = {'official': official, 'custom': custom, 'joke': joke}[category]
             state['selected_category'] = category
             state['menu_page'] = 0
             _save_state()
-            await interaction.response.edit_message(content="# pick a challenge\nuse the dropdown to select the one you completed", view=ChallengeMenuView(category, roles, 0, interaction.guild))
+            await interaction.response.edit_message(content=VM["flow_pick_challenge"], view=ChallengeMenuView(category, roles, 0, interaction.guild))
         return cb
 
     def _make_page_cb(self, delta: int):
         async def cb(interaction: discord.Interaction):
             state = _get_state(interaction.channel_id)
             if interaction.user.id != state['op_id']:
-                await interaction.response.send_message("this isn't for you", ephemeral=True)
+                await interaction.response.send_message(VM["err_not_op"], ephemeral=True)
                 return
             official, custom, joke = _get_challenge_roles(interaction.guild)
             cat = state.get('selected_category', 'official')
@@ -547,13 +552,13 @@ class ChallengeMenuView(View):
             new_page = state['menu_page'] + delta
             state['menu_page'] = new_page
             _save_state()
-            await interaction.response.edit_message(content="# pick a challenge\nuse the dropdown to select the one you completed", view=ChallengeMenuView(cat, roles, new_page, interaction.guild))
+            await interaction.response.edit_message(content=VM["flow_pick_challenge"], view=ChallengeMenuView(cat, roles, new_page, interaction.guild))
         return cb
 
     async def _on_select(self, interaction: discord.Interaction):
         state = _get_state(interaction.channel_id)
         if interaction.user.id != state['op_id']:
-            await interaction.response.send_message("this isn't for you", ephemeral=True)
+            await interaction.response.send_message(VM["err_not_op"], ephemeral=True)
             return
         val = interaction.data['values'][0]
         if val == 'none':
@@ -562,11 +567,11 @@ class ChallengeMenuView(View):
         role_id = int(val)
         role = interaction.guild.get_role(role_id)
         if not role:
-            await interaction.response.send_message("role not found", ephemeral=True)
+            await interaction.response.send_message(VM["err_role_not_found"], ephemeral=True)
             return
         info = parse_challenge_role(role)
         if not info:
-            await interaction.response.send_message("invalid challenge", ephemeral=True)
+            await interaction.response.send_message(VM["err_invalid_challenge"], ephemeral=True)
             return
         state['selected_role_id'] = role_id
         if not state.get('verifiers_needed'):
@@ -598,15 +603,15 @@ class ChallengeConfirmView(View):
     def __init__(self):
         super().__init__(timeout=None)
 
-        bv = Button(label="verify (X more)", style=discord.ButtonStyle.success, disabled=True, custom_id="v:cfm:vrfy")
+        bv = Button(label=VM["btn_verify"].format(needed="X"), style=discord.ButtonStyle.success, disabled=True, custom_id="v:cfm:vrfy")
         bv.callback = self._dummy
         self.add_item(bv)
 
-        br = Button(label="report", style=discord.ButtonStyle.secondary, disabled=True, custom_id="v:cfm:rpt")
+        br = Button(label=VM["btn_request_mod"], style=discord.ButtonStyle.secondary, disabled=True, custom_id="v:cfm:rpt")
         br.callback = self._dummy
         self.add_item(br)
 
-        bc = Button(label="change challenge", style=discord.ButtonStyle.secondary, custom_id="v:cfg:change")
+        bc = Button(label=VM["btn_change"], style=discord.ButtonStyle.secondary, custom_id="v:cfg:change")
         bc.callback = self._on_change
         self.add_item(bc)
 
@@ -616,10 +621,10 @@ class ChallengeConfirmView(View):
     async def _on_change(self, interaction: discord.Interaction):
         state = _get_state(interaction.channel_id)
         if interaction.user.id != state['op_id']:
-            await interaction.response.send_message("this isn't for you", ephemeral=True)
+            await interaction.response.send_message(VM["err_not_op"], ephemeral=True)
             return
         if state.get('verifiers_done', 0) > 0:
-            await interaction.response.send_message("can't change challenge after one or more verifications happened", ephemeral=True)
+            await interaction.response.send_message(VM["err_cant_change"], ephemeral=True)
             return
         official, custom, joke = _get_challenge_roles(interaction.guild)
         cat = state.get('selected_category', 'official')
@@ -627,18 +632,18 @@ class ChallengeConfirmView(View):
         state['state'] = 'choose_challenge'
         _save_state()
         view = ChallengeMenuView(cat, roles, 0, interaction.guild)
-        await interaction.response.edit_message(content="# pick a challenge\nuse the dropdown to select the one you completed", view=view)
+        await interaction.response.edit_message(content=VM["flow_pick_challenge"], view=view)
 
 
 class NoFootageView(View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="no footage / other platform", style=discord.ButtonStyle.danger, custom_id="v:nofoot")
+    @discord.ui.button(label=VM["btn_no_footage"], style=discord.ButtonStyle.danger, custom_id="v:nofoot")
     async def no_footage_btn(self, interaction: discord.Interaction, button: Button):
         state = _get_state(interaction.channel_id)
         if interaction.user.id != state['op_id']:
-            await interaction.response.send_message("this isn't for you", ephemeral=True)
+            await interaction.response.send_message(VM["err_not_op"], ephemeral=True)
             return
         state['state'] = 'needs_verification'
         _save_state()
@@ -650,7 +655,7 @@ class OwnerVerifyPromptView(View):
         super().__init__()
         self.is_redo = is_redo
 
-    @discord.ui.button(label="yes, verify anyway", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label=VM["btn_verify_anyway"], style=discord.ButtonStyle.primary)
     async def confirm(self, interaction: discord.Interaction, button: Button):
         state = _get_state(interaction.channel_id)
         thread = interaction.channel
@@ -659,21 +664,21 @@ class OwnerVerifyPromptView(View):
         try:
             bot_msg = await thread.fetch_message(state['message_id'])
         except:
-            await interaction.response.edit_message(content="could not find the verification message", view=None)
+            await interaction.response.edit_message(content=VM["err_no_bot_msg"], view=None)
             return
-        await interaction.response.edit_message(content="proceeding...", view=None)
+        await interaction.response.edit_message(content=VM["info_proceeding"], view=None)
         await _do_verify(thread, state, user_id, mention, bot_msg)
 
-    @discord.ui.button(label="cancel", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label=VM["btn_cancel"], style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, button: Button):
-        await interaction.response.edit_message(content="verification cancelled", view=None)
+        await interaction.response.edit_message(content=VM["info_cancelled"], view=None)
 
 
 class OwnerVerifySelfView(View):
     def __init__(self):
         super().__init__()
 
-    @discord.ui.button(label="yes, i'm sure, verify anyway", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label=VM["btn_verify_self"], style=discord.ButtonStyle.primary)
     async def confirm(self, interaction: discord.Interaction, button: Button):
         state = _get_state(interaction.channel_id)
         thread = interaction.channel
@@ -682,30 +687,30 @@ class OwnerVerifySelfView(View):
         try:
             bot_msg = await thread.fetch_message(state['message_id'])
         except:
-            await interaction.response.edit_message(content="could not find the verification message", view=None)
+            await interaction.response.edit_message(content=VM["err_no_bot_msg"], view=None)
             return
-        await interaction.response.edit_message(content="proceeding...", view=None)
+        await interaction.response.edit_message(content=VM["info_proceeding"], view=None)
         await _do_verify(thread, state, user_id, mention, bot_msg)
 
-    @discord.ui.button(label="cancel", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label=VM["btn_cancel"], style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, button: Button):
-        await interaction.response.edit_message(content="verification cancelled", view=None)
+        await interaction.response.edit_message(content=VM["info_cancelled"], view=None)
 
 
 class VerificationView(View):
     def __init__(self, verifiers_needed: int, hide_change: bool = False):
         super().__init__(timeout=None)
 
-        vbtn = Button(label=f"verify ({verifiers_needed} more)", style=discord.ButtonStyle.success, custom_id="v:verify")
+        vbtn = Button(label=VM["btn_verify"].format(needed=verifiers_needed), style=discord.ButtonStyle.success, custom_id="v:verify")
         vbtn.callback = self._on_verify
         self.add_item(vbtn)
 
-        rbtn = Button(label="request mod", style=discord.ButtonStyle.secondary, custom_id="v:report")
+        rbtn = Button(label=VM["btn_request_mod"], style=discord.ButtonStyle.secondary, custom_id="v:report")
         rbtn.callback = self._on_report
         self.add_item(rbtn)
 
         if not hide_change:
-            cbtn = Button(label="change challenge", style=discord.ButtonStyle.secondary, custom_id="v:ver:change")
+            cbtn = Button(label=VM["btn_change"], style=discord.ButtonStyle.secondary, custom_id="v:ver:change")
             cbtn.callback = self._on_change
             self.add_item(cbtn)
 
@@ -721,13 +726,13 @@ class VerificationView(View):
     async def _on_verify(self, interaction: discord.Interaction):
         state = _get_state(interaction.channel_id)
         if state.get('state') in ('reported', 'manual'):
-            await interaction.response.send_message("this thread is locked for verification", ephemeral=True)
+            await interaction.response.send_message(VM["err_locked"], ephemeral=True)
             return
         user = interaction.user
         if not isinstance(user, discord.Member):
             user = interaction.guild.get_member(user.id)
         if not user:
-            await interaction.response.send_message("could not verify identity", ephemeral=True)
+            await interaction.response.send_message(VM["err_no_identity"], ephemeral=True)
             return
 
         is_owner = user.id == interaction.guild.owner_id
@@ -736,38 +741,36 @@ class VerificationView(View):
         already = user.id in state.get('verified_by', [])
 
         if not is_owner and not has_role:
-            await interaction.response.send_message("you don't have permission to do that", ephemeral=True)
+            await interaction.response.send_message(VM["err_not_verifier"], ephemeral=True)
             return
 
         if is_op:
             if is_owner:
                 prompt = OwnerVerifySelfView()
-                await interaction.response.send_message(
-                    "you're the runner of this run **and** the server owner.\nare you sure you want to verify yourself?",
-                    view=prompt, ephemeral=True)
+                await interaction.response.send_message(VM["prompt_self_verify_owner"], view=prompt, ephemeral=True)
                 return
             else:
-                await interaction.response.send_message("you can't verify your own run", ephemeral=True)
+                await interaction.response.send_message(VM["err_self_verify"], ephemeral=True)
                 return
 
         if already:
             if is_owner:
                 prompt = OwnerVerifyPromptView(is_redo=True)
-                await interaction.response.send_message("you already verified this run. are you sure you want to do it again?", view=prompt, ephemeral=True)
+                await interaction.response.send_message(VM["prompt_redo_owner"], view=prompt, ephemeral=True)
             else:
-                await interaction.response.send_message("you already verified this run", ephemeral=True)
+                await interaction.response.send_message(VM["err_already_done"], ephemeral=True)
             return
 
         if is_owner and not has_role:
             prompt = OwnerVerifyPromptView(is_redo=False)
-            await interaction.response.send_message("you don't have the verifier role. are you sure you want to verify this run?", view=prompt, ephemeral=True)
+            await interaction.response.send_message(VM["prompt_owner_no_role"], view=prompt, ephemeral=True)
             return
 
         thread = interaction.channel
         try:
             bot_msg = await thread.fetch_message(state['message_id'])
         except:
-            await interaction.response.send_message("could not find the verification message", ephemeral=True)
+            await interaction.response.send_message(VM["err_no_bot_msg"], ephemeral=True)
             return
 
         await _do_verify(thread, state, user.id, user.mention, bot_msg)
@@ -775,7 +778,7 @@ class VerificationView(View):
     async def _on_report(self, interaction: discord.Interaction):
         state = _get_state(interaction.channel_id)
         if state.get('state') in ('reported', 'manual'):
-            await interaction.response.send_message("this thread is locked for verification", ephemeral=True)
+            await interaction.response.send_message(VM["err_locked"], ephemeral=True)
             return
         user = interaction.user
         if not isinstance(user, discord.Member):
@@ -784,18 +787,11 @@ class VerificationView(View):
         has_role = await self._is_verifier(interaction)
 
         if not is_owner and not has_role:
-            await interaction.response.send_message("you don't have permission to do that", ephemeral=True)
+            await interaction.response.send_message(VM["err_not_verifier"], ephemeral=True)
             return
 
         await interaction.response.send_message(
-            "# request moderation assistance\n"
-            "this will pause verifications and ping <@&{MOD_ROLE_ID}>.\n"
-            "a moderator will review the thread and decide what to do.\n\n"
-            "**this doesn't mean the run is invalid or cheated.** it just means a human needs to look at it — for example:\n"
-            "• the bot can't handle what's needed (e.g. awarding multiple roles)\n"
-            "• the runner picked the wrong challenge and can't change it\n"
-            "• anything else that requires assistance\n"
-            "### are you sure you want to escalate?",
+            VM["report_prompt"].format(MOD_ROLE_ID=MOD_ROLE_ID),
             view=ReportConfirmView(),
             ephemeral=True,
         )
@@ -803,10 +799,10 @@ class VerificationView(View):
     async def _on_change(self, interaction: discord.Interaction):
         state = _get_state(interaction.channel_id)
         if interaction.user.id != state['op_id']:
-            await interaction.response.send_message("this isn't for you", ephemeral=True)
+            await interaction.response.send_message(VM["err_not_op"], ephemeral=True)
             return
         if state.get('verifiers_done', 0) > 0:
-            await interaction.response.send_message("can't change challenge after a verification has happened", ephemeral=True)
+            await interaction.response.send_message(VM["err_cant_change"], ephemeral=True)
             return
         official, custom, joke = _get_challenge_roles(interaction.guild)
         cat = state.get('selected_category', 'official')
@@ -814,14 +810,14 @@ class VerificationView(View):
         state['state'] = 'choose_challenge'
         _save_state()
         view = ChallengeMenuView(cat, roles, 0, interaction.guild)
-        await interaction.response.edit_message(content="# pick a challenge\nuse the dropdown to select the one you completed", view=view)
+        await interaction.response.edit_message(content=VM["flow_pick_challenge"], view=view)
 
 
 class ReportConfirmView(View):
     def __init__(self):
         super().__init__()
 
-    @discord.ui.button(label="yes, escalate", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label=VM["btn_escalate"], style=discord.ButtonStyle.danger)
     async def confirm_btn(self, interaction: discord.Interaction, button: Button):
         state = _get_state(interaction.channel_id)
         state['state'] = 'reported'
@@ -830,17 +826,17 @@ class ReportConfirmView(View):
         await _set_tags(thread, [TAG_REPORTED])
         role_mention = f"<@&{state['selected_role_id']}>" if state.get('selected_role_id') else "???"
         content = _build_challenge_message(state, interaction.guild)
-        await interaction.response.edit_message(content="# run escalated to moderators", view=None)
+        await interaction.response.edit_message(content=VM["report_escalated"], view=None)
         main_msg = thread.get_partial_message(state['message_id'])
         try:
             await main_msg.edit(content=content, view=ReportResolveView())
         except:
             pass
-        await thread.send(f"<@&{MOD_ROLE_ID}> {role_mention} needs moderator assistance")
+        await thread.send(VM["report_notify"].format(MOD_ROLE_ID=MOD_ROLE_ID, role_mention=role_mention))
 
-    @discord.ui.button(label="cancel", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label=VM["btn_cancel"], style=discord.ButtonStyle.secondary)
     async def cancel_btn(self, interaction: discord.Interaction, button: Button):
-        await interaction.response.edit_message(content="report cancelled", view=None)
+        await interaction.response.edit_message(content=VM["report_cancelled"], view=None)
 
 
 class ReportResolveView(View):
@@ -854,11 +850,11 @@ class ReportResolveView(View):
         mod_role = interaction.guild.get_role(MOD_ROLE_ID)
         if not mod_role or not member or mod_role not in member.roles:
             if not member or member.id != interaction.guild.owner_id:
-                await interaction.response.send_message("you don't have permission to do that", ephemeral=True)
+                await interaction.response.send_message(VM["err_not_verifier"], ephemeral=True)
                 return False
         return True
 
-    @discord.ui.button(label="resolve report", style=discord.ButtonStyle.primary, custom_id="v:resolve")
+    @discord.ui.button(label=VM["btn_resolve"], style=discord.ButtonStyle.primary, custom_id="v:resolve")
     async def resolve_btn(self, interaction: discord.Interaction, button: Button):
         if not await self._check_mod(interaction):
             return
@@ -872,9 +868,9 @@ class ReportResolveView(View):
         content = _build_challenge_message(state, interaction.guild)
         view = VerificationView(remaining, hide_change=state['verifiers_done'] > 0)
         await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping())
-        await thread.send(f"report resolved by {interaction.user.mention} — returning to normal verification", allowed_mentions=_no_ping())
+        await thread.send(VM["report_resolved"].format(mention=interaction.user.mention), allowed_mentions=_no_ping())
 
-    @discord.ui.button(label="enter manual mode", style=discord.ButtonStyle.secondary, custom_id="v:manual:enter")
+    @discord.ui.button(label=VM["btn_manual_enter"], style=discord.ButtonStyle.secondary, custom_id="v:manual:enter")
     async def manual_btn(self, interaction: discord.Interaction, button: Button):
         if not await self._check_mod(interaction):
             return
@@ -885,9 +881,9 @@ class ReportResolveView(View):
         thread = interaction.channel
         await _set_tags(thread, [TAG_NEEDS_VERIFICATION])
         content = _build_challenge_message(state, interaction.guild)
-        content += "\n\n<:required:1463357222632292458> **manual mode** — only moderators can interact with the buttons below. use them to resolve this thread."
+        content += VM["flow_manual_desc"]
         await interaction.response.edit_message(content=content, view=ManualModeView(), allowed_mentions=_no_ping())
-        await thread.send(f"manual mode activated by {interaction.user.mention}", allowed_mentions=_no_ping())
+        await thread.send(VM["manual_activated"].format(mention=interaction.user.mention), allowed_mentions=_no_ping())
 
 
 class ManualModeView(View):
@@ -901,11 +897,11 @@ class ManualModeView(View):
         mod_role = interaction.guild.get_role(MOD_ROLE_ID)
         if not mod_role or not member or mod_role not in member.roles:
             if not member or member.id != interaction.guild.owner_id:
-                await interaction.response.send_message("you don't have permission to do that", ephemeral=True)
+                await interaction.response.send_message(VM["err_not_verifier"], ephemeral=True)
                 return False
         return True
 
-    @discord.ui.button(label="exit manual mode", style=discord.ButtonStyle.secondary, custom_id="v:manual:exit")
+    @discord.ui.button(label=VM["btn_manual_exit"], style=discord.ButtonStyle.secondary, custom_id="v:manual:exit")
     async def exit_btn(self, interaction: discord.Interaction, button: Button):
         if not await self._check_mod(interaction):
             return
@@ -919,21 +915,21 @@ class ManualModeView(View):
         content = _build_challenge_message(state, interaction.guild)
         view = VerificationView(remaining, hide_change=state['verifiers_done'] > 0)
         await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping())
-        await thread.send(f"manual mode ended by {interaction.user.mention} — returning to normal verification", allowed_mentions=_no_ping())
+        await thread.send(VM["manual_exit"].format(mention=interaction.user.mention), allowed_mentions=_no_ping())
 
-    @discord.ui.button(label="mark verified (no roles)", style=discord.ButtonStyle.success, custom_id="v:manual:verify")
+    @discord.ui.button(label=VM["btn_manual_verify_no_roles"], style=discord.ButtonStyle.success, custom_id="v:manual:verify")
     async def verify_no_roles_btn(self, interaction: discord.Interaction, button: Button):
         if not await self._check_mod(interaction):
             return
         state = _get_state(interaction.channel_id)
         thread = interaction.channel
         role_mention = f"<@&{state['selected_role_id']}>" if state.get('selected_role_id') else "???"
-        await interaction.response.edit_message(content=f"# <:doors_trophy:1499481077272674456> {role_mention} is verified!", view=None, allowed_mentions=_no_ping())
-        await thread.send(f"<:doors_trophy:1499481077272674456> {role_mention} was marked as verified without awarding roles\n-# by {interaction.user.mention}", allowed_mentions=_no_ping())
+        await interaction.response.edit_message(content=VM["verif_done_bot"].format(role_mention=role_mention), view=None, allowed_mentions=_no_ping())
+        await thread.send(VM["manual_verify_no_roles"].format(role_mention=role_mention, mention=interaction.user.mention), allowed_mentions=_no_ping())
         await thread.edit(archived=True, locked=True)
         _clean_state(thread.id)
 
-    @discord.ui.button(label="mark verified with roles", style=discord.ButtonStyle.primary, custom_id="v:manual:verify_roles")
+    @discord.ui.button(label=VM["btn_manual_verify_roles"], style=discord.ButtonStyle.primary, custom_id="v:manual:verify_roles")
     async def verify_with_roles_btn(self, interaction: discord.Interaction, button: Button):
         if not await self._check_mod(interaction):
             return
@@ -949,8 +945,8 @@ class ManualModeView(View):
             async with RoleSession(member) as rs:
                 rs.add(role_id)
         role_mention = f"<@&{role_id}>" if role_id else "???"
-        await interaction.response.edit_message(content=f"# <:doors_trophy:1499481077272674456> {role_mention} is verified!", view=None, allowed_mentions=_no_ping())
-        await thread.send(f"<:doors_trophy:1499481077272674456> {role_mention} verified by {interaction.user.mention}\n-# the role was given automatically", allowed_mentions=_no_ping())
+        await interaction.response.edit_message(content=VM["verif_done_bot"].format(role_mention=role_mention), view=None, allowed_mentions=_no_ping())
+        await thread.send(VM["manual_verify_roles"].format(role_mention=role_mention, mention=interaction.user.mention), allowed_mentions=_no_ping())
         await thread.edit(archived=True, locked=True)
         _clean_state(thread.id)
 
