@@ -31,6 +31,8 @@ TAG_1_NEEDED = 1502769259238133854
 TAG_REPORTED = 1502769374098882671
 TAG_VERIFIED = 1502769297498308669
 TAG_REJECTED = 1503659032890839150
+TAG_MANUAL = 1503867427958816929
+TAG_PREPARING = 1503895658678059141
 
 YOUTUBE_RE = re.compile(
     r'(?:https?://)?(?:www\.|m\.)?'
@@ -195,6 +197,10 @@ async def _set_tags(thread: discord.Thread, tag_ids: list[int]):
 def _verifier_tag(count: int) -> int:
     return {3: TAG_3_NEEDED, 2: TAG_2_NEEDED, 1: TAG_1_NEEDED}.get(count, TAG_3_NEEDED)
 
+def _next_5min_interval() -> int:
+    now = int(time.time())
+    return ((now // 300) + 1) * 300
+
 def _build_challenge_message(state: dict, guild: discord.Guild) -> str:
     VM = config.verification_messages
     role_id = state.get('selected_role_id')
@@ -278,6 +284,7 @@ async def start_verification_flow(thread: discord.Thread):
     msg = await thread.send(VM["flow_start"].format(op_id=thread.owner_id), view=view)
     s['message_id'] = msg.id
     _save_state()
+    await _set_tags(thread, [TAG_PREPARING])
 
 async def _handle_video_check(starter_msg: discord.Message, thread: discord.Thread, state: dict, bot_msg: discord.Message):
     video_id = None
@@ -316,7 +323,7 @@ async def _process_video(video_id: str, thread: discord.Thread, state: dict, bot
         await _enter_verification_phase(thread, state, bot_msg)
     else:
         state['state'] = 'awaiting_upload'
-        state['next_check_at'] = int(time.time()) + 300
+        state['next_check_at'] = _next_5min_interval()
         _save_state()
         await _set_tags(thread, [TAG_UPLOADING])
         content = _build_challenge_message(state, thread.guild)
@@ -340,7 +347,7 @@ async def _enter_verification_phase(thread: discord.Thread, state: dict, bot_msg
         role = thread.guild.get_role(state['selected_role_id']) if state.get('selected_role_id') else None
         info = parse_challenge_role(role) if role else None
         name = info['name'] if info else "???"
-        await thread.send(VM["verif_ping"].format(name=name, VERIFIER_ROLE_ID=VERIFIER_ROLE_ID), allowed_mentions=_no_ping())
+        await thread.send(VM["verif_ping"].format(name=name, VERIFIER_ROLE_ID=VERIFIER_ROLE_ID), allowed_mentions=discord.AllowedMentions(roles=[VERIFIER_ROLE_ID]))
 
 async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: discord.Message = None):
     VM = config.verification_messages
@@ -377,7 +384,7 @@ async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: d
             await bot_msg.edit(content="\n".join(final_lines), view=None, allowed_mentions=_no_ping())
         except:
             pass
-    await thread.edit(archived=True, locked=False)
+    await thread.edit(archived=True, locked=True)
     _clean_state(thread.id)
 
 # ── Message listeners ──────────────────────────────────────────────────────
@@ -478,6 +485,8 @@ class ChallengeCategoryView(View):
         state['state'] = 'ignore'
         state['ignore'] = True
         _save_state()
+        thread = interaction.channel
+        await _set_tags(thread, [])
         view = ReopenView()
         await interaction.response.edit_message(
             content=VM["flow_ignore"],
@@ -499,6 +508,8 @@ class ReopenView(View):
         state['state'] = 'choose_category'
         state['ignore'] = False
         _save_state()
+        thread = interaction.channel
+        await _set_tags(thread, [TAG_PREPARING])
         view = ChallengeCategoryView()
         await interaction.response.edit_message(
             content=VM["flow_pick_category"].format(op_mention=f"<@{state['op_id']}>"),
@@ -935,7 +946,7 @@ class ReportResolveView(View):
         state['report_resolved'] = True
         _save_state()
         thread = interaction.channel
-        await _set_tags(thread, [TAG_NEEDS_VERIFICATION])
+        await _set_tags(thread, [TAG_REPORTED, TAG_MANUAL])
         content = _build_challenge_message(state, interaction.guild)
         content += VM["flow_manual_desc"]
         await interaction.response.edit_message(content=content, view=ManualModeView(), allowed_mentions=_no_ping())
@@ -962,7 +973,8 @@ class RejectConfirmView(View):
         except:
             pass
         await thread.send(VM["reject_notify"].format(mention=interaction.user.mention))
-        await thread.edit(archived=True)
+        await thread.edit(archived=True, locked=True)
+        _clean_state(thread.id)
 
     @discord.ui.button(label=VM["btn_cancel"], style=discord.ButtonStyle.secondary)
     async def cancel_btn(self, interaction: discord.Interaction, button: Button):
@@ -1041,7 +1053,7 @@ class ManualModeView(View):
         role_mention = f"<@&{state['selected_role_id']}>" if state.get('selected_role_id') else "???"
         await interaction.response.edit_message(content=VM["verif_done_bot"].format(role_mention=role_mention), view=None, allowed_mentions=_no_ping())
         await thread.send(VM["manual_verify_no_roles"].format(role_mention=role_mention, mention=interaction.user.mention), allowed_mentions=_no_ping())
-        await thread.edit(archived=True)
+        await thread.edit(archived=True, locked=True)
         _clean_state(thread.id)
 
     @discord.ui.button(label=VM["btn_manual_verify_roles"], style=discord.ButtonStyle.primary, custom_id="v:manual:verify_roles")
@@ -1062,7 +1074,7 @@ class ManualModeView(View):
         role_mention = f"<@&{role_id}>" if role_id else "???"
         await interaction.response.edit_message(content=VM["verif_done_bot"].format(role_mention=role_mention), view=None, allowed_mentions=_no_ping())
         await thread.send(VM["manual_verify_roles"].format(role_mention=role_mention, mention=interaction.user.mention), allowed_mentions=_no_ping())
-        await thread.edit(archived=True)
+        await thread.edit(archived=True, locked=True)
         _clean_state(thread.id)
 
 
@@ -1070,6 +1082,8 @@ class ManualModeView(View):
 
 @tasks.loop(minutes=5)
 async def video_polling_loop():
+    now = int(time.time())
+    next_check = ((now // 300) + 1) * 300
     for key, s in list(_state.items()):
         try:
             if s.get('state') != 'awaiting_upload':
@@ -1081,23 +1095,36 @@ async def video_polling_loop():
             if not video_id:
                 continue
             status = await _check_youtube_video(video_id)
-            if status != 'available':
-                continue
-            thread = bot.get_channel(s['thread_id'])
-            if not isinstance(thread, discord.Thread):
+            if status == 'available':
+                thread = bot.get_channel(s['thread_id'])
+                if not isinstance(thread, discord.Thread):
+                    try:
+                        thread = await bot.fetch_channel(s['thread_id'])
+                    except:
+                        continue
+                    if not isinstance(thread, discord.Thread):
+                        continue
                 try:
-                    thread = await bot.fetch_channel(s['thread_id'])
+                    msg = await thread.fetch_message(s['message_id'])
                 except:
                     continue
-                if not isinstance(thread, discord.Thread):
-                    continue
-            try:
-                msg = await thread.fetch_message(s['message_id'])
-            except:
-                continue
-            s['video_ready'] = True
-            _save_state()
-            await _enter_verification_phase(thread, s, msg)
+                s['video_ready'] = True
+                _save_state()
+                await _enter_verification_phase(thread, s, msg)
+            else:
+                s['next_check_at'] = next_check
+                _save_state()
+                try:
+                    thread = bot.get_channel(s['thread_id'])
+                    if not isinstance(thread, discord.Thread):
+                        thread = await bot.fetch_channel(s['thread_id'])
+                    if not isinstance(thread, discord.Thread):
+                        continue
+                    msg = await thread.fetch_message(s['message_id'])
+                    content = _build_challenge_message(s, thread.guild)
+                    await msg.edit(content=content, allowed_mentions=_no_ping(), suppress=True)
+                except:
+                    pass
         except Exception:
             pass  # keep the loop alive on transient errors
 
