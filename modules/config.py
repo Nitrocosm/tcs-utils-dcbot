@@ -246,19 +246,21 @@ verification_messages = {
     "btn_manual_verify_roles": "mark verified as usual",
     "select_placeholder": "select a challenge...",
     "no_challenges": "no challenges available",
-    "btn_prev": "\u25c0 prev",
-    "btn_next": "next \u25b6",
+    "btn_prev": "< prev",
+    "btn_next": "next >",
 
     # ── Main bot message (pinned) ──
-    "msg_header": "# {role_mention}\n{op_mention} completed **{name}**",
+    "msg_header_title": "# {role_mention} completion",
+    "msg_header_body": "{op_mention} completed **{name}**",
     "msg_body_reported": "## <:disconnect:1499465485144686682> reported - awaiting moderator review",
     "msg_body_manual": "## <:required:1463357222632292458> manual mode - only moderators can act",
-    "msg_body_ready": "## <:yes:1463357188964618413> video is ready // `{done}/{needed}` verifications",
+    "msg_body_ready": "## <:yes:1463357188964618413> video is ready // {done}/{needed} verifications",
     "msg_body_ready_last": "-# last verifier: {last}",
     "msg_body_uploading": "## <:doors_globe:1499578536904622101> the video is uploading",
     "msg_body_uploading_check": "-# will ping the verifiers when the video is ready\n-# next check: <t:{ts}:R>",
     "msg_body_uploading_hint": "",
     "msg_body_no_video": "## <:not_applicable:1500106312560672912> waiting for a youtube link",
+    "msg_body_no_footage": "## <:no:1454950318042255410> no footage or other platform",
     "msg_body_no_video_hint": "edit your post or paste a youtube link in this chat",
     "msg_url_line": "-# {url}",
 
@@ -272,9 +274,9 @@ verification_messages = {
 
     # ── Verification event messages ──
     "verif_ping": "## <:required:1463357222632292458> <@&{VERIFIER_ROLE_ID}> new **{name}** completion!\n-# after watching the video click \"verify\" on the pinned message above\n-# if something needs a moderator, click \"request mod\" instead\n-# make sure the correct challenge is selected",
-    "verif_in_progress": "<:yes:1463357188964618413> verified by {mention} // `{remaining}` more needed",
+    "verif_in_progress": "<:yes:1463357188964618413> verified by {mention} // {remaining} more needed",
     "verif_complete": "<:yes:1463357188964618413> verified by {mention} // run is verified!",
-    "verif_done_bot": "# <:doors_trophy:1499481077272674456> this {role_mention} completion is verified!",
+    "verif_done_bot": "# <:doors_trophy:1499481077272674456> verified {role_mention} completion",
     "verif_done_thread": "<:doors_trophy:1499481077272674456> {role_mention} finished verification!\n-# the role was given automatically\n-# the bot doesn't do <#1427066908812906526> posts yet, if one needs to be done - do it",
 
     # ── Owner override / verification prompts ──

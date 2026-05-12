@@ -79,6 +79,7 @@ def _init_state(thread_id: int, op_id: int) -> dict:
         'next_check_at': None,
         'report_resolved': False,
         'ignore': False,
+        'no_footage': False,
         'verifier_pinged': False,
     }
     return _state[k]
@@ -204,7 +205,8 @@ def _build_challenge_message(state: dict, guild: discord.Guild) -> str:
     st = state.get('state', '')
 
     lines = [
-        VM["msg_header"].format(role_mention=role_mention, op_mention=op_mention, name=name),
+        VM["msg_header_title"].format(role_mention=role_mention),
+        VM["msg_header_body"].format(op_mention=op_mention, name=name),
     ]
 
     video_url = state.get('video_url')
@@ -226,6 +228,8 @@ def _build_challenge_message(state: dict, guild: discord.Guild) -> str:
         if nxt:
             lines.append(VM["msg_body_uploading_check"].format(ts=nxt))
         lines.append(VM["msg_body_uploading_hint"])
+    elif state.get('no_footage'):
+        lines.append(VM["msg_body_no_footage"])
     else:
         lines.append(VM["msg_body_no_video"])
         if st == 'awaiting_video':
@@ -350,7 +354,19 @@ async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: d
     await thread.send(VM["verif_done_thread"].format(role_mention=role_mention, last=last), allowed_mentions=_no_ping())
     if bot_msg:
         try:
-            await bot_msg.edit(content=VM["verif_done_bot"].format(role_mention=role_mention), view=None, allowed_mentions=_no_ping())
+            role = thread.guild.get_role(role_id) if role_id else None
+            info = parse_challenge_role(role) if role else None
+            name = info['name'] if info else "???"
+            op_mention = f"<@{op_id}>"
+            final_lines = [
+                VM["msg_header_title"].format(role_mention=role_mention),
+                VM["msg_header_body"].format(op_mention=op_mention, name=name),
+            ]
+            if state.get('video_url'):
+                final_lines.append(VM["msg_url_line"].format(url=state['video_url']))
+            final_lines.append("")
+            final_lines.append(VM["verif_done_bot"].format(role_mention=role_mention))
+            await bot_msg.edit(content="\n".join(final_lines), view=None, allowed_mentions=_no_ping())
         except:
             pass
     await thread.edit(archived=True, locked=False)
@@ -645,6 +661,7 @@ class NoFootageView(View):
         if interaction.user.id != state['op_id']:
             await interaction.response.send_message(VM["err_not_op"], ephemeral=True)
             return
+        state['no_footage'] = True
         state['state'] = 'needs_verification'
         _save_state()
         await _enter_verification_phase(interaction.channel, state, interaction.message)
