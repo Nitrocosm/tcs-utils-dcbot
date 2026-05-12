@@ -14,12 +14,12 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.0.6-debug'
+version = 'v5.1.0'
 
 changelog = \
 f"""
 ## {version} changelog
-- :fire:
+- cool stuff! wait for trailer ;3
 """
 
 ################################################################
