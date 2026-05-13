@@ -208,6 +208,8 @@ def _build_challenge_message(state: dict, guild: discord.Guild) -> str:
     role = guild.get_role(role_id) if role_id else None
     info = parse_challenge_role(role) if role else None
     name = info['name'] if info else "???"
+    if info and info['points'] == 0:
+        name = f"[JOKE BADGE] {name}"
     role_mention = f"<@&{role_id}>" if role_id else "???"
     op_mention = f"<@{op_id}>"
     st = state.get('state', '')

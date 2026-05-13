@@ -14,12 +14,12 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.1.2'
+version = 'v5.1.1-2'
 
 changelog = \
 f"""
 ## {version} changelog
-- fix verifier ping
+- add [JOKE BADGE] prefix to joke badge posts
 """
 
 ################################################################
