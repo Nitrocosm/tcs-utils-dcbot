@@ -14,12 +14,12 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.1.1-2'
+version = 'v5.1.1-3'
 
 changelog = \
 f"""
 ## {version} changelog
-- add [JOKE BADGE] prefix to joke badge posts
+- fix a small thing
 """
 
 ################################################################
@@ -1748,7 +1748,7 @@ async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
         new_status = None
 
         if bot.get_channel(entry._target_id) == vc:
-            new_status = vc.status
+            #new_status = vc.status
             if new_status: await general.send(config.message('edit_vc', member=entry.user.mention, status=new_status), pings=discord.AllowedMentions.none())
             else: await general.send(config.message('edit_vc_no_status', member=entry.user.mention), pings=discord.AllowedMentions.none())
         elif bot.get_channel(entry._target_id) == vc2:
