@@ -14,15 +14,12 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.1.1'
+version = 'v5.1.2'
 
 changelog = \
 f"""
 ## {version} changelog
-- added manual & preparing forum tags
-- verification threads now lock on completion/rejection/manual-verify
-- verifier pings now actually ping the verifier role (instead of suppressing)
-- video check timestamps now align to 5-minute boundaries
+- fix verifier ping
 """
 
 ################################################################
