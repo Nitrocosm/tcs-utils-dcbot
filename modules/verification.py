@@ -208,8 +208,6 @@ def _build_challenge_message(state: dict, guild: discord.Guild) -> str:
     role = guild.get_role(role_id) if role_id else None
     info = parse_challenge_role(role) if role else None
     name = info['name'] if info else "???"
-    if info and info['points'] == 0:
-        name = f"[JOKE BADGE] {name}"
     role_mention = f"<@&{role_id}>" if role_id else "???"
     op_mention = f"<@{op_id}>"
     st = state.get('state', '')
@@ -620,6 +618,8 @@ class ChallengeMenuView(View):
             op = thread.guild.get_member(state['op_id'])
             op_name = op.display_name if op else f"user-{state['op_id']}"
             new_name = f"{info['name']} by {op_name}"[:100]
+            if info and info['points'] == 0:
+                new_name = f"[JOKE BADGE] {new_name}"
             try:
                 await thread.edit(name=new_name)
             except:
