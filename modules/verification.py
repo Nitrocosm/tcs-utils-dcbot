@@ -14,7 +14,7 @@ from modules import config
 from modules.bot_init import bot
 from modules.points import parse_challenge_role
 from modules.role_management import RoleSession
-from modules.badges import badge_emoji_for_name as _badge_emoji
+from modules.badges import DIFFICULTY_PLACEHOLDERS, badge_emoji_for_name as _badge_emoji, points_to_difficulty
 
 VM = config.verification_messages
 
@@ -103,28 +103,8 @@ def _select_emoji_for_challenge(guild: discord.Guild, name: str, points: int) ->
     emoji = _badge_emoji(guild, name)
     if emoji:
         return emoji
-    diff = 0
-    if points <= 0:   diff = 0
-    elif points <= 2: diff = 1
-    elif points <= 4: diff = 2
-    elif points <= 7: diff = 3
-    elif points <= 10: diff = 4
-    elif points <= 13: diff = 5
-    elif points <= 17: diff = 6
-    elif points <= 23: diff = 7
-    else: diff = 8
-    placeholders = [
-        "<:badge_placeholder_custom_npc:1468336218407436328>",
-        "<:badge_placeholder_custom_normal:1468336216171614490>",
-        "<:badge_placeholder_custom_hard:1468336226154184867>",
-        "<:badge_placeholder_custom_insane:1468336205635784988>",
-        "<:badge_placeholder_custom_extreme:1468336223444537414>",
-        "<:badge_placeholder_custom_brutal:1468336220609314877>",
-        "<:badge_placeholder_custom_maso:1468336214124925073>",
-        "<:badge_placeholder_custom_leg:1468336228914172119>",
-        "<:badge_placeholder_custom_godlike:1468518569619886111>",
-    ]
-    m = re.match(r"<:(\w+):(\d+)>", placeholders[diff])
+    placeholder = DIFFICULTY_PLACEHOLDERS[points_to_difficulty(points)]
+    m = re.match(r"<:(\w+):(\d+)>", placeholder)
     return discord.PartialEmoji(name=m.group(1), id=int(m.group(2))) if m else None
 
 def _get_challenge_roles(guild: discord.Guild):

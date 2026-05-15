@@ -24,7 +24,7 @@ LEADERBOARD_DISPLAY_ROLES = {
 # difficulty placeholders
 # -------------------------
 
-_DIFFICULTY_PLACEHOLDERS = [
+DIFFICULTY_PLACEHOLDERS = [
     "<:badge_placeholder_custom_npc:1468336218407436328>",      # 0  – NPC
     "<:badge_placeholder_custom_normal:1468336216171614490>",   # 1  – normal (1-2)
     "<:badge_placeholder_custom_hard:1468336226154184867>",     # 2  – hard (3-4)
@@ -37,7 +37,7 @@ _DIFFICULTY_PLACEHOLDERS = [
 ]
 
 
-def _points_to_difficulty(points: int) -> int:
+def points_to_difficulty(points: int) -> int:
     if points <= 0:  return 0
     if points <= 2:  return 1
     if points <= 4:  return 2
@@ -54,7 +54,7 @@ def get_challenge_emoji(guild: discord.Guild, name: str, points: int) -> str:
     emoji = badge_emoji_for_name(guild, name)
     if emoji:
         return str(emoji)
-    return _DIFFICULTY_PLACEHOLDERS[_points_to_difficulty(points)]
+    return DIFFICULTY_PLACEHOLDERS[points_to_difficulty(points)]
 
 
 # -------------------------
@@ -177,8 +177,8 @@ class WardrobeSelectView(View):
             if raw_emoji:
                 select_emoji = raw_emoji
             else:
-                difficulty = _points_to_difficulty(pts)
-                placeholder_str = _DIFFICULTY_PLACEHOLDERS[difficulty]
+                difficulty = points_to_difficulty(pts)
+                placeholder_str = DIFFICULTY_PLACEHOLDERS[difficulty]
                 import re as _re
                 m = _re.match(r"<:(\w+):(\d+)>", placeholder_str)
                 select_emoji = discord.PartialEmoji(name=m.group(1), id=int(m.group(2))) if m else None
