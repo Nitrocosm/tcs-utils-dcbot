@@ -72,9 +72,6 @@ roles = {
     # completion roles
     "completion_all_base": 1453450000297365576,
     "completion_all_ultimate": 1454594165857063004,
-
-    "completion_server_star_star": 1454594165857063004,
-    "completion_server_base_star": 1453450000297365576
 }
 
 
