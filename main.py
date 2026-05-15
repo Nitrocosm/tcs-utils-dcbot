@@ -21,6 +21,7 @@ EXTENSIONS: list[str] = [
     'cogs.moderation',
     'cogs.activity',
     'cogs.points',
+    'cogs.saves',
 ]
 
 
@@ -454,63 +455,6 @@ async def on_thread_create(thread: discord.Thread):
 
     await thread.send(f"<@&{config.roles['verifier']}> new challenge to verify")
     #------------------------------------
-@bot.command()
-@general.try_bot_perms
-async def save(ctx, *args):
-    if not args:
-        return await ctx.send("usage: `.save [name] @member1 @member2 ...`")
-
-    # Parse arguments - check if first arg is a member or a name
-    # save_name = None
-    # members = []
-    #
-    # for i, arg in enumerate(args):
-    #     try:
-    #         member = await commands.MemberConverter().convert(ctx, arg)
-    #         members.append(member)
-    #     except commands.MemberNotFound:
-    #         # If it's the first argument, and we have no members yet, treat as name
-    #         if i == 0 and not members:
-    #             save_name = arg
-    #         else:
-    #             return await ctx.send(f"couldn't find member: `{arg}`")
-
-    name_parts = []
-    members = []
-    name_done = False
-
-    for arg in args:
-        try:
-            member = await commands.MemberConverter().convert(ctx, arg)
-            members.append(member)
-            name_done = True
-        except commands.MemberNotFound:
-            if name_done or members:
-                return await ctx.send(f"couldn't find member: `{arg}`")
-            name_parts.append(arg)
-
-    save_name = " ".join(name_parts) if name_parts else None
-
-    if not members:
-        return await ctx.send("usage: `.save [name] @member1 @member2 ...`")
-
-    return await create_save(ctx, members, save_name)
-
-
-@bot.command()
-@general.try_bot_perms
-async def rename(ctx, *args):
-    name = " ".join(args) if args else None
-    await rename_save(ctx, name)
-
-
-@bot.command()
-async def disband(ctx):
-    await disband_save(ctx)
-
-
-
-
 CHALLENGE_ROLE_CATEGORIES = {
     "badge":     "badges",       # fragment of your badges category name
     "display":   "display",      # fragment of your display badge category name
