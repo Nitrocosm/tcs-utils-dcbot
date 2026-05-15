@@ -29,14 +29,7 @@ async def timed_delete_msg(msg: discord.Message, text: str, duration: int = 10):
 
 async def send_timed_delete_msg(text: str, duration: int = 10, where: str = 'chat') -> None:
     msg = await send(text, where=where)
-    for i in range(1, duration):
-        if i <= 11:
-            await msg.edit(content=f':clock{duration-i}: {text}')
-            await asyncio.sleep(1)
-        else:
-            await msg.edit(content=f':white_check_mark: {text}')
-            await asyncio.sleep(1)
-    await msg.delete()
+    await timed_delete_msg(msg, text, duration)
 
 
 
