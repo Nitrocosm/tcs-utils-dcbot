@@ -19,7 +19,7 @@ version = 'v5.1.2-1'
 changelog = \
 f"""
 ## {version} changelog
-- ok fine
+- now bot only sends dm if kick by command & also shows kick reasons in mod chat
 """
 
 ################################################################
@@ -584,7 +584,7 @@ async def on_member_remove(member: discord.Member):
                 (discord.utils.utcnow() - entry.created_at).total_seconds() < 5:
                     await general.send(config.message('kick', mention=member.mention, display=member.nick))
                     await general.send(
-                        f':information_source:<:kick:1439803052826689537> {member.mention} ({member.display_name}) got kicked',
+                        f':information_source:<:kick:1439803052826689537> {member.mention} ({member.display_name}) got kicked{f' for {entry.reason}' if entry.reason else ''}',
                         'mod_chat')
                     return
 
@@ -593,7 +593,7 @@ async def on_member_remove(member: discord.Member):
                 (discord.utils.utcnow() - entry.created_at).total_seconds() < 5:
                     await general.send(config.message('ban', mention=member.mention, display=member.nick))
                     await general.send(
-                        f':information_source:<:ban:1438882547588141118> {member.mention} ({member.display_name}) got banned',
+                        f':information_source:<:ban:1438882547588141118> {member.mention} ({member.display_name}) got banned{f' for {entry.reason}' if entry.reason else ''}',
                         'mod_chat')
                     return
 
@@ -970,6 +970,7 @@ async def kick(ctx, member: discord.Member = None, *, reason: str = None):
                       f'> {reason}\n'
                       f'\n'
                       f'this isn\'t a ban. [you can freely reapply to the server at any point if you wish!](https://discord.gg/JAQvpgzErd)')
+    await ctx.send('-# sent the kicked guy a dm btw')
     await member.kick(reason=reason)
 
 
