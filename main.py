@@ -14,12 +14,12 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.1.2-1'
+version = 'v5.1.2-2'
 
 changelog = \
 f"""
 ## {version} changelog
-- now bot only sends dm if kick by command & also shows kick reasons in mod chat
+- revert everything discord is retarded fuck discord
 """
 
 ################################################################
@@ -966,11 +966,14 @@ async def unpin(ctx):
 @general.has_perms('kick_members')
 @general.can_moderate_member
 async def kick(ctx, member: discord.Member = None, *, reason: str = None):
-    await member.send(f'hey there! you got kicked from **these challenges suck** for the following reason:\n'
-                      f'> {reason}\n'
-                      f'\n'
-                      f'this isn\'t a ban. [you can freely reapply to the server at any point if you wish!](https://discord.gg/JAQvpgzErd)')
-    await ctx.send('-# sent the kicked guy a dm btw')
+    try:
+        await member.send(f'hey there! you got kicked from **these challenges suck** for the following reason:\n'
+                          f'> {reason}\n'
+                          f'\n'
+                          f'this isn\'t a ban. [you can freely reapply to the server at any point if you wish!](https://discord.gg/JAQvpgzErd)')
+        await ctx.send('-# sent the kicked guy a dm btw')
+    except:
+        await ctx.send('-# couldnt send the guy a dm bc discord dumb asf')
     await member.kick(reason=reason)
 
 
