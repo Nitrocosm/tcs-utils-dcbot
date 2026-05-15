@@ -14,12 +14,12 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.1.1-3'
+version = 'v5.1.2'
 
 changelog = \
 f"""
 ## {version} changelog
-- fix a small thing
+- add bot auto dm ppl when they get kicked
 """
 
 ################################################################
@@ -586,6 +586,10 @@ async def on_member_remove(member: discord.Member):
                     await general.send(
                         f':information_source:<:kick:1439803052826689537> {member.mention} ({member.display_name}) got kicked',
                         'mod_chat')
+                    await member.send(f'hey there! you got kicked from **these challenges suck** for the following reason:\n'
+                                      f'> {entry.reason}\n'
+                                      f'\n'
+                                      f'this isn\'t a ban. [you can freely reapply to the server at any point if you wish!](https://discord.gg/JAQvpgzErd)')
                     return
 
         async for entry in guild.audit_logs(limit=1, action=discord.AuditLogAction.ban):
