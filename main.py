@@ -2,8 +2,8 @@ import asyncio
 
 import discord
 from discord import VoiceChannel
-from discord.ext import commands, tasks
-from modules import config, activity, moderation, general, badges, role_management, verification, logging_config
+from discord.ext import commands
+from modules import config, activity, moderation, general, badges, verification, logging_config
 from modules.config import TARGET_GUILD
 from modules.general import timed_delete_msg, send_timed_delete_msg
 from modules.role_management import RoleSession
@@ -16,83 +16,10 @@ bot.pings = True
 
 # Cogs are loaded in main() below. Each commit in Phase 2 appends to this list
 # as commands/events migrate out of main.py and into cogs/.
-EXTENSIONS: list[str] = []
-
-################################################################
-
-version = 'v5.1.3-2'
-
-changelog = \
-f"""
-## {version} changelog
-- change literally 2 characters
-"""
-
-################################################################
-
-
-
-@tasks.loop(minutes=45)
-async def member_checker():
-    await activity.check_all_members()
-    await activity.run_activity_checks()
-
-
-@member_checker.error
-async def member_checker_error(error: Exception):
-    member_checker.stop()
-    member_checker.start()
-    await general.send(f'-# :warning: member_checker crashed :/ ```{error}```\n\n-# restarted it, but if you need to restart it manually use .force_check_all (available to mods too btw)', 'mod_chat')
-    # the loop will automatically restart on next interval since we don't re-raise
-
-@bot.event
-async def on_ready():
-    msg = await general.send(f':radio_button: bot connected... {version}')
-    await general.set_status('starting up...', status=discord.Status.idle) # type: ignore
-    await bot.wait_until_ready()
-    bot.add_view(badges.WardrobeOpenView())
-    await msg.edit(content=f':radio_button: connecting to badge wardrobe...')
-    await badges.ensure_wardrobe_message(bot)
-    await msg.edit(content=f':radio_button: syncing host ping reactions...')
-    await activity.sync_interested_reactions()
-    await msg.edit(content=f':radio_button: fetching role relations...')
-    await role_management.load_role_relations(bot)
-    await msg.edit(content=f':radio_button: restoring verification sessions...')
-    await verification.restore_sessions(bot)
-    #msg = await general.send(f'-# :eye: building up activity cache', 'mod_chat')
-    await msg.edit(content=f':green_circle: restart complete!{changelog}')
-    await activity.build_activity_cache()
-    #await msg.edit(content='-# :white_check_mark: done')
-    if not member_checker.is_running():
-        member_checker.start()
-
-@bot.command()
-@general.try_bot_perms
-@general.has_perms('owner')
-async def load_role_relations(ctx):
-    await role_management.load_role_relations(bot)
-    await ctx.message.add_reaction("✅")
-
-@bot.command()
-@general.try_bot_perms
-@general.has_perms('owner')
-async def p(ctx):
-    if bot.pings:
-        await ctx.message.add_reaction("🪫")
-        bot.pings = False
-    else:
-        await ctx.message.add_reaction("🔋")
-        bot.pings = True
-
-
-
-@bot.command()
-@general.try_bot_perms
-@general.has_perms('manage_roles')
-async def force_check_all(ctx):
-    member_checker.stop()
-    member_checker.start()
-    await ctx.message.add_reaction("✅")
+EXTENSIONS: list[str] = [
+    'cogs.core',
+]
+)
 
 @bot.command()
 @general.try_bot_perms
@@ -101,34 +28,6 @@ async def check(ctx, member: discord.Member):
     async with RoleSession(member) as rs:
         await activity.full_check_member(rs, member)
         await send_timed_delete_msg(f'checked {member.display_name}')
-
-@bot.command()
-@general.try_bot_perms
-async def test(ctx):
-    await ctx.send(f'test pass\n-# {version}')
-
-@bot.command()
-@general.try_bot_perms
-@general.has_perms('owner')
-async def force_reactions(ctx):
-    await activity.sync_interested_reactions()
-    await ctx.message.add_reaction("✅")
-
-
-
-@bot.event
-async def on_command_error(ctx: commands.Context, error: Exception):
-    if isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f'missing argument: `{error.param.name}`')
-    elif isinstance(error, commands.MemberNotFound):
-        await ctx.send(f"couldn't find member: `{error.argument}`")
-    elif isinstance(error, commands.BadArgument):
-        await ctx.send(f'bad argument: {error}')
-    elif isinstance(error, commands.CommandNotFound):
-        pass  # silently ignore unknown commands
-    elif not isinstance(error, commands.CommandInvokeError):
-        # CommandInvokeError means it was already handled by try_bot_perms
-        await ctx.send(f'something went wrong: ```{error}```')
 
 
 @bot.event
@@ -1153,35 +1052,6 @@ async def r(ctx, start_id: int, end_id: int = None):
             await asyncio.sleep(1)
 
         return await timed_delete_msg(res_msg, f'deleted {total_deleted} messages', 10)
-
-
-@bot.command()
-@general.try_bot_perms
-@general.has_perms('owner')
-async def update(ctx):
-    import subprocess
-    msg = await ctx.send(':radio_button: pulling from git...')
-    try:
-        result = subprocess.run(
-            ['git', 'pull'],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        if result.returncode != 0:
-            return await ctx.send(content=f':warning: git pull failed\n```{result.stderr}```')
-        res = result.stdout.splitlines()
-        text = ''
-        for line in res:
-            text = f'{text}\n-# {line}'
-        await ctx.send(content=f':radio_button: pulled from git!{text}')
-        await ctx.send(content=f':radio_button: restarting bot...')
-        subprocess.Popen(['systemctl', 'restart', '--user', 'tcs-utils-dcbot'])
-
-    except subprocess.TimeoutExpired:
-        await ctx.send(content=':x: git pull timed out')
-    except Exception as e:
-        await ctx.send(content=f':x: error: ```{e}```')
 
 
 @bot.command()
