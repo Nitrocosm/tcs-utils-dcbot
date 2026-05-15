@@ -24,36 +24,8 @@ EXTENSIONS: list[str] = [
     'cogs.saves',
     'cogs.server_events',
     'cogs.challenges',
+    'cogs.verification',
 ]
-
-
-
-
-# Forum auto-tag mapping is configured in modules/config/ids.py
-FORUM_CHANNEL_TAG_IDS = config.FORUM_CHANNEL_TAG_IDS
-
-@bot.event
-async def on_thread_create(thread: discord.Thread):
-    await asyncio.sleep(1)
-    if not isinstance(thread.parent, discord.ForumChannel):
-        return
-    if thread.parent_id == verification.VERIFICATION_FORUM_ID:
-        await verification.start_verification_flow(thread)
-        return
-    if thread.parent_id not in FORUM_CHANNEL_TAG_IDS:
-        return
-
-    tag = thread.parent.get_tag(FORUM_CHANNEL_TAG_IDS[thread.parent_id])
-    if tag:
-        current_tags = thread.applied_tags
-        if tag not in current_tags:
-            current_tags.append(tag)
-            await thread.edit(applied_tags=current_tags)
-
-    await thread.send(f"<@&{config.roles['verifier']}> new challenge to verify")
-    #------------------------------------
-
-
 
 
 
