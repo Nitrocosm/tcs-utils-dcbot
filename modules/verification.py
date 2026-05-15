@@ -254,6 +254,24 @@ def _build_challenge_message(state: dict, guild: discord.Guild) -> str:
 def _no_ping():
     return discord.AllowedMentions.none()
 
+
+async def _check_mod(interaction: discord.Interaction) -> bool:
+    """Return True if the interaction's invoker is a mod (or the server owner).
+
+    On failure, sends the `err_not_verifier` ephemeral response so callers
+    can just `if not await _check_mod(interaction): return`.
+    """
+    member = interaction.user
+    if not isinstance(member, discord.Member):
+        member = interaction.guild.get_member(member.id)
+    mod_role = interaction.guild.get_role(MOD_ROLE_ID)
+    if not mod_role or not member or mod_role not in member.roles:
+        if not member or member.id != interaction.guild.owner_id:
+            await interaction.response.send_message(VM["err_not_verifier"], ephemeral=True)
+            return False
+    return True
+
+
 # ── Verification logic ──────────────────────────────────────────────────────
 
 _NONCE_SEPARATOR = "::vnonce::"
@@ -913,20 +931,9 @@ class ReportResolveView(View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    async def _check_mod(self, interaction: discord.Interaction) -> bool:
-        member = interaction.user
-        if not isinstance(member, discord.Member):
-            member = interaction.guild.get_member(member.id)
-        mod_role = interaction.guild.get_role(MOD_ROLE_ID)
-        if not mod_role or not member or mod_role not in member.roles:
-            if not member or member.id != interaction.guild.owner_id:
-                await interaction.response.send_message(VM["err_not_verifier"], ephemeral=True)
-                return False
-        return True
-
     @discord.ui.button(label=VM["btn_resolve"], style=discord.ButtonStyle.primary, custom_id="v:resolve")
     async def resolve_btn(self, interaction: discord.Interaction, button: Button):
-        if not await self._check_mod(interaction):
+        if not await _check_mod(interaction):
             return
         state = _get_state(interaction.channel_id)
         state['state'] = 'verification'
@@ -942,7 +949,7 @@ class ReportResolveView(View):
 
     @discord.ui.button(label=VM["btn_manual_enter"], style=discord.ButtonStyle.secondary, custom_id="v:manual:enter")
     async def manual_btn(self, interaction: discord.Interaction, button: Button):
-        if not await self._check_mod(interaction):
+        if not await _check_mod(interaction):
             return
         state = _get_state(interaction.channel_id)
         state['state'] = 'manual'
@@ -988,20 +995,9 @@ class RejectResolveView(View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    async def _check_mod(self, interaction: discord.Interaction) -> bool:
-        member = interaction.user
-        if not isinstance(member, discord.Member):
-            member = interaction.guild.get_member(member.id)
-        mod_role = interaction.guild.get_role(MOD_ROLE_ID)
-        if not mod_role or not member or mod_role not in member.roles:
-            if not member or member.id != interaction.guild.owner_id:
-                await interaction.response.send_message(VM["err_not_verifier"], ephemeral=True)
-                return False
-        return True
-
     @discord.ui.button(label=VM["btn_reinstate"], style=discord.ButtonStyle.primary, custom_id="v:reinstate")
     async def reinstate_btn(self, interaction: discord.Interaction, button: Button):
-        if not await self._check_mod(interaction):
+        if not await _check_mod(interaction):
             return
         state = _get_state(interaction.channel_id)
         state['state'] = 'verification'
@@ -1020,20 +1016,9 @@ class ManualModeView(View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    async def _check_mod(self, interaction: discord.Interaction) -> bool:
-        member = interaction.user
-        if not isinstance(member, discord.Member):
-            member = interaction.guild.get_member(member.id)
-        mod_role = interaction.guild.get_role(MOD_ROLE_ID)
-        if not mod_role or not member or mod_role not in member.roles:
-            if not member or member.id != interaction.guild.owner_id:
-                await interaction.response.send_message(VM["err_not_verifier"], ephemeral=True)
-                return False
-        return True
-
     @discord.ui.button(label=VM["btn_manual_exit"], style=discord.ButtonStyle.secondary, custom_id="v:manual:exit")
     async def exit_btn(self, interaction: discord.Interaction, button: Button):
-        if not await self._check_mod(interaction):
+        if not await _check_mod(interaction):
             return
         state = _get_state(interaction.channel_id)
         state['state'] = 'verification'
@@ -1049,7 +1034,7 @@ class ManualModeView(View):
 
     @discord.ui.button(label=VM["btn_manual_verify_no_roles"], style=discord.ButtonStyle.success, custom_id="v:manual:verify")
     async def verify_no_roles_btn(self, interaction: discord.Interaction, button: Button):
-        if not await self._check_mod(interaction):
+        if not await _check_mod(interaction):
             return
         state = _get_state(interaction.channel_id)
         thread = interaction.channel
@@ -1061,7 +1046,7 @@ class ManualModeView(View):
 
     @discord.ui.button(label=VM["btn_manual_verify_roles"], style=discord.ButtonStyle.primary, custom_id="v:manual:verify_roles")
     async def verify_with_roles_btn(self, interaction: discord.Interaction, button: Button):
-        if not await self._check_mod(interaction):
+        if not await _check_mod(interaction):
             return
         state = _get_state(interaction.channel_id)
         thread = interaction.channel
