@@ -12,6 +12,11 @@ from modules.points import calculate_points, get_ranked_leaderboard, update_lead
 from modules.bot_init import bot
 
 logging_config.setup()
+bot.pings = True
+
+# Cogs are loaded in main() below. Each commit in Phase 2 appends to this list
+# as commands/events migrate out of main.py and into cogs/.
+EXTENSIONS: list[str] = []
 
 ################################################################
 
@@ -68,19 +73,16 @@ async def load_role_relations(ctx):
     await role_management.load_role_relations(bot)
     await ctx.message.add_reaction("✅")
 
-pings = True
-
 @bot.command()
 @general.try_bot_perms
 @general.has_perms('owner')
 async def p(ctx):
-    global pings
-    if pings:
+    if bot.pings:
         await ctx.message.add_reaction("🪫")
-        pings = False
+        bot.pings = False
     else:
         await ctx.message.add_reaction("🔋")
-        pings = True
+        bot.pings = True
 
 
 
@@ -673,8 +675,7 @@ async def on_message(message: discord.Message):
         #             "ping moderators instead; they will escalate if necessary.\n"
         #             "-# more info: https://discord.com/channels/1426972810332340406/1434248797369663518/1490686502160695336"
         #         )
-        global pings
-        if not pings:
+        if not bot.pings:
             if isinstance(message.author, discord.Member):
                 if f'<@{config.OWNER_ID}>' in message.content:
                     await message.reply(
@@ -1770,5 +1771,12 @@ async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
         elif entry._target_id == config.channels['vc3']:
             await general.send(config.message('edit_vc_3_clear', member=entry.user.mention), pings=discord.AllowedMentions.none())
 
+async def main():
+    async with bot:
+        for ext in EXTENSIONS:
+            await bot.load_extension(ext)
+        await bot.start(config.TOKEN)
+
+
 if __name__ == '__main__':
-    bot.run(config.TOKEN, log_handler=None)
+    asyncio.run(main())
