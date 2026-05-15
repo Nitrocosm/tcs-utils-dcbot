@@ -40,7 +40,7 @@ async def send_timed_delete_msg(text: str, duration: int = 10, where: str = 'cha
 
 
 async def count_filtered_members(guild: Guild) -> int:
-    excluded_role_id = 1427013313837011175 # alts
+    excluded_role_id = config.roles['alts']
     excluded_role = guild.get_role(excluded_role_id)
 
     if excluded_role is None:
@@ -167,7 +167,7 @@ def can_moderate_member(func):
     async def wrapper(ctx, member: discord.Member = None, *args, **kwargs):
         if not member:
             await ctx.send(config.message("bot_doesnt_have_perms"))
-            return await ctx.send('<@534097411048603648> fix ur fucking bot\n'
+            return await ctx.send(f'<@{config.OWNER_ID}> fix ur fucking bot\n'
                                   'you added a @can_moderate_member decorator where you shouldn\'t have dumbass\n'
                                   '-# [can_moderate_member expects a member in the command args, no member arg found]')
         if member == ctx.author:
@@ -186,12 +186,12 @@ def try_bot_perms(func):
             await func(ctx, *args, **kwargs)
         except discord.Forbidden as e:
             await ctx.send(config.message("bot_doesnt_have_perms"))
-            await ctx.send(f'<@534097411048603648> fix ur fucking bot\n```{e}```')
+            await ctx.send(f'<@{config.OWNER_ID}> fix ur fucking bot\n```{e}```')
             raise e
         except Exception as e:
             await ctx.send(config.message("bot_doesnt_have_perms"))
             log.exception('error in try_bot_perms')
-            await ctx.send(f'<@534097411048603648> fix ur fucking bot\n```{e}```')
+            await ctx.send(f'<@{config.OWNER_ID}> fix ur fucking bot\n```{e}```')
             raise e
     return wrapper
 

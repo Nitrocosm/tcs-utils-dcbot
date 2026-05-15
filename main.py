@@ -205,12 +205,8 @@ async def on_voice_state_update(member, before, after):
     await general.update_status(bot)
 
 
-# Reaction Roles - easy hot-swap
-REACTION_ROLES = {
-    1451676590558937221: {  # message_id
-        "⚠️": 1451675068114669740,  # emoji: role_id
-    }
-}
+# Reaction roles are configured in modules/config/ids.py
+REACTION_ROLES = config.REACTION_ROLES
 
 
 @bot.event
@@ -342,7 +338,7 @@ async def on_member_update(before, after):
             old_rank = get_member_rank(after.guild, before)
             challenge_changed = False
 
-            log_thread = after.guild.get_thread(1457200972215484417)
+            log_thread = after.guild.get_thread(config.channels['challenge_log_thread'])
 
             for role in added_roles:
                 role_info = parse_challenge_role(role)
@@ -680,7 +676,7 @@ async def on_message(message: discord.Message):
         global pings
         if not pings:
             if isinstance(message.author, discord.Member):
-                if '<@534097411048603648>' in message.content:
+                if f'<@{config.OWNER_ID}>' in message.content:
                     await message.reply(
                         "*note: lostya marked themself temporarily unavailable. they will come back to the ping later.*\n"
                         "*in the meanwhile, try pinging one of the other available mods instead.*\n"
@@ -737,9 +733,8 @@ async def on_message(message: discord.Message):
         await bot.process_commands(message)
 
 
-FORUM_CHANNEL_TAG_IDS = {1443764605695557753: 1456989366076313773,
-                         1465308641757364397: 1467173431605985331}
-ROLE_ID = 1466886852039671962
+# Forum auto-tag mapping is configured in modules/config/ids.py
+FORUM_CHANNEL_TAG_IDS = config.FORUM_CHANNEL_TAG_IDS
 
 @bot.event
 async def on_thread_create(thread: discord.Thread):
@@ -759,7 +754,7 @@ async def on_thread_create(thread: discord.Thread):
             current_tags.append(tag)
             await thread.edit(applied_tags=current_tags)
 
-    await thread.send(f"<@&{ROLE_ID}> new challenge to verify")
+    await thread.send(f"<@&{config.roles['verifier']}> new challenge to verify")
     #------------------------------------
 
 

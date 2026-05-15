@@ -55,6 +55,8 @@ roles = {
     "warn_3": 1442623000452005948,
     "mod": 1433828741548740781,
     "spoiler": 1451675068114669740,
+    "verifier": 1466886852039671962,
+    "alts": 1427013313837011175,  # excluded from member counts
 
     # leaderboard display badges (user-chosen)
     "lb_display_top_1": 1469749458777538776,
@@ -93,6 +95,7 @@ channels = {
     "spoiler_access": 1451675640771383478,
     "spoiler_role": 1451675068114669740,
     "leaderboard": 1456353494448734331,
+    "challenge_log_thread": 1457200972215484417,
 }
 
 
@@ -199,4 +202,26 @@ emoji = {
     '9g': '<:9g:1448879532508451019>',
     '9p': '<:9p:1448879535033421935>',
     '9r': '<:9r:1464759452316991619>'
+}
+
+
+# ── Single user IDs ──────────────────────────────────────────────────────────
+
+OWNER_ID = 534097411048603648  # lostya
+
+
+# ── Reaction roles ───────────────────────────────────────────────────────────
+# message_id -> { emoji: role_id }
+REACTION_ROLES = {
+    1451676590558937221: {
+        '⚠️': 1451675068114669740,  # == roles['spoiler']
+    },
+}
+
+
+# ── Forum auto-tagging ───────────────────────────────────────────────────────
+# forum_channel_id -> tag_id applied to every new thread in that forum
+FORUM_CHANNEL_TAG_IDS = {
+    1443764605695557753: 1456989366076313773,
+    1465308641757364397: 1467173431605985331,
 }
