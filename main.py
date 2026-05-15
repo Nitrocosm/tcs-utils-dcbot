@@ -3,7 +3,7 @@ import asyncio
 import discord
 from discord import VoiceChannel
 from discord.ext import commands, tasks
-from modules import config, activity, moderation, general, badges, role_management, verification
+from modules import config, activity, moderation, general, badges, role_management, verification, logging_config
 from modules.config import TARGET_GUILD
 from modules.general import timed_delete_msg, send_timed_delete_msg
 from modules.role_management import RoleSession
@@ -11,6 +11,7 @@ from modules.saves import create_save, disband_save, rename_save
 from modules.points import calculate_points, get_ranked_leaderboard, update_leaderboard_message, parse_challenge_role, get_member_rank, has_all_challenges, LB_EMOJI
 from modules.bot_init import bot
 
+logging_config.setup()
 
 ################################################################
 
@@ -1767,4 +1768,4 @@ async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
             await general.send(config.message('edit_vc_3_clear', member=entry.user.mention), pings=discord.AllowedMentions.none())
 
 if __name__ == '__main__':
-    bot.run(config.TOKEN)
+    bot.run(config.TOKEN, log_handler=None)

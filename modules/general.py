@@ -1,9 +1,12 @@
 import asyncio
+import logging
 import discord
 from discord import Guild
 from modules import config
 from modules.config import TARGET_GUILD
 from modules.bot_init import bot
+
+log = logging.getLogger(__name__)
 
 
 async def send(msg: str, where: str = 'chat', pings: discord.AllowedMentions = None) -> discord.Message:
@@ -41,7 +44,7 @@ async def count_filtered_members(guild: Guild) -> int:
     excluded_role = guild.get_role(excluded_role_id)
 
     if excluded_role is None:
-        print(f"warning: role id {excluded_role_id} not found")
+        log.warning('role id %s not found', excluded_role_id)
 
     member_count = 0
     for member in guild.members:
@@ -187,7 +190,7 @@ def try_bot_perms(func):
             raise e
         except Exception as e:
             await ctx.send(config.message("bot_doesnt_have_perms"))
-            print(f"error in try_perm: {e}")
+            log.exception('error in try_bot_perms')
             await ctx.send(f'<@534097411048603648> fix ur fucking bot\n```{e}```')
             raise e
     return wrapper
