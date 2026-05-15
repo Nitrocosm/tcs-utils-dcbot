@@ -1,21 +1,23 @@
+"""Entry point for tcs-utils-dcbot.
+
+Sets up logging, loads cog extensions, and starts the bot. All commands and
+event handlers live in the ``cogs/`` package; ``modules/`` holds the business
+logic.
+
+``modules.verification`` is imported for its side-effect of self-registering
+its own ``@bot.listen`` / ``@tasks.loop`` hooks at import time. That wiring
+has not yet moved into a cog — see "Phase 2.5" in the refactor plan, which
+will migrate it once Phase 5 lands the pure-logic test suite.
+"""
 import asyncio
 
-import discord
-from discord import VoiceChannel
-from discord.ext import commands
-from modules import config, activity, moderation, general, badges, verification, logging_config
-from modules.config import TARGET_GUILD
-from modules.general import timed_delete_msg, send_timed_delete_msg
-from modules.role_management import RoleSession
-from modules.saves import create_save, disband_save, rename_save
-from modules.points import calculate_points, get_ranked_leaderboard, update_leaderboard_message, parse_challenge_role, get_member_rank, has_all_challenges, LB_EMOJI
+import modules.verification  # noqa: F401 -- side-effect: registers @bot.listen / @tasks.loop
+from modules import config, logging_config
 from modules.bot_init import bot
 
 logging_config.setup()
 bot.pings = True
 
-# Cogs are loaded in main() below. Each commit in Phase 2 appends to this list
-# as commands/events migrate out of main.py and into cogs/.
 EXTENSIONS: list[str] = [
     'cogs.core',
     'cogs.moderation',
@@ -26,12 +28,6 @@ EXTENSIONS: list[str] = [
     'cogs.challenges',
     'cogs.verification',
 ]
-
-
-
-
-
-
 
 
 async def main():
