@@ -98,19 +98,9 @@ class PointsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.command()
+    @commands.command(aliases=['pts', 'stats'])
     @general.try_bot_perms
     async def points(self, ctx, member: discord.Member = None):
-        await stat_checker(ctx, member)
-
-    @commands.command()
-    @general.try_bot_perms
-    async def pts(self, ctx, member: discord.Member = None):
-        await stat_checker(ctx, member)
-
-    @commands.command()
-    @general.try_bot_perms
-    async def stats(self, ctx, member: discord.Member = None):
         await stat_checker(ctx, member)
 
 
