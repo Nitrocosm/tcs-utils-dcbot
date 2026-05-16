@@ -14,12 +14,12 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.1.2-2'
+version = 'v5.1.3'
 
 changelog = \
 f"""
 ## {version} changelog
-- revert everything discord is retarded fuck discord
+- fix verification forum pinging challenge completion owners
 """
 
 ################################################################
