@@ -198,7 +198,6 @@ def update_cache(member_id: int, ts: float = None) -> None:
 
 async def build_activity_cache() -> None:
     """Runs once on startup to seed the cache and prevent false positives."""
-    guild = bot.get_guild(config.TARGET_GUILD)
     chat = bot.get_channel(config.channels['chat'])
 
     log.info('building activity cache...')

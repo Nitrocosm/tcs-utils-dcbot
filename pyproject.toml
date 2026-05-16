@@ -7,6 +7,10 @@ line-length = 120
 # Stricter rule sets (import sorting, bugbear, etc.) can be enabled in a later phase
 # once the codebase is cleaned up enough not to drown in warnings.
 select = ["E", "F", "W"]
+# Discord message templates are intentionally long; the codebase has historical
+# one-liner `if x: y` and semicolon-chained statements that we don't want CI to
+# fight us over today.
+ignore = ["E501", "E701", "E702"]
 
 [tool.ruff.format]
 quote-style = "single"
