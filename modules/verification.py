@@ -348,7 +348,7 @@ async def _enter_verification_phase(thread: discord.Thread, state: dict, bot_msg
         role = thread.guild.get_role(state['selected_role_id']) if state.get('selected_role_id') else None
         info = parse_challenge_role(role) if role else None
         name = info['name'] if info else "???"
-        await thread.send(VM["verif_ping"].format(name=name, VERIFIER_ROLE_ID=VERIFIER_ROLE_ID), allowed_mentions=AllowedMentions.none())
+        await thread.send(VM["verif_ping"].format(name=name, VERIFIER_ROLE_ID=VERIFIER_ROLE_ID))
 
 async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: discord.Message = None):
     VM = config.verification_messages
@@ -382,7 +382,7 @@ async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: d
                 final_lines.append(VM["msg_body_verified_by"].format(verifiers=verifier_mentions))
             final_lines.append("")
             final_lines.append(VM["verif_done_bot"].format(role_mention=role_mention))
-            await bot_msg.edit(content="\n".join(final_lines), view=None, allowed_mentions=_no_ping())
+            await bot_msg.edit(content="\n".join(final_lines), view=None, allowed_mentions=AllowedMentions.none())
         except:
             pass
     await thread.edit(archived=True, locked=True)
