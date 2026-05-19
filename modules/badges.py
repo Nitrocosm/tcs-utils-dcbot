@@ -4,7 +4,7 @@ from modules.points import parse_challenge_role, get_ranked_leaderboard, sync_le
 from modules.role_management import RoleSession
 from modules import config
 
-WARDROBE_CHANNEL_ID = 1468068634680229979
+WARDROBE_CHANNEL_ID = config.WARDROBE_CHANNEL_ID
 WARDROBE_CUSTOM_ID = "wardrobe:open"
 WARDROBE_MESSAGE_TEXT = (
     "# <:badge_placeholder:1454599839189962783> **badge wardrobe**\n"

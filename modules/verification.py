@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 VM = config.verification_messages
 
-VERIFICATION_FORUM_ID = 1502768684085678200
+VERIFICATION_FORUM_ID = config.VERIFICATION_FORUM_ID
 STATE_FILE = 'verification_state.json'
 
 VERIFIER_ROLE_ID = config.roles['verifier']

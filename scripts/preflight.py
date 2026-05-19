@@ -23,14 +23,15 @@ import discord  # noqa: E402
 from dotenv import load_dotenv  # noqa: E402
 
 from modules import config  # noqa: E402
-from modules.activity import (  # noqa: E402
-    INTERESTED_MESSAGE_BASE,
-    INTERESTED_MESSAGE_STAR,
-    INTERESTED_MESSAGE_ULTIMATE,
-)
-from modules.badges import WARDROBE_CHANNEL_ID  # noqa: E402
-from modules.role_management import RELATIONS_CHANNEL_ID  # noqa: E402
-from modules.verification import VERIFICATION_FORUM_ID  # noqa: E402
+
+# These IDs live in config now (used to be hardcoded in their respective
+# modules). Pulling them via config ensures the staging swap is honoured.
+INTERESTED_MESSAGE_BASE = config.INTERESTED_MESSAGE_BASE
+INTERESTED_MESSAGE_STAR = config.INTERESTED_MESSAGE_STAR
+INTERESTED_MESSAGE_ULTIMATE = config.INTERESTED_MESSAGE_ULTIMATE
+WARDROBE_CHANNEL_ID = config.WARDROBE_CHANNEL_ID
+RELATIONS_CHANNEL_ID = config.RELATIONS_CHANNEL_ID
+VERIFICATION_FORUM_ID = config.VERIFICATION_FORUM_ID
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
@@ -171,13 +172,18 @@ async def run_checks(client: discord.Client) -> int:
         config.channels["availability_message"],
     )
 
-    # availability_reaction is a custom-emoji id; check it's present in the guild
+    # availability_reaction is a custom-emoji id; check it's present in the guild.
+    # Staging mode writes 0 here as a sentinel meaning "Unicode emoji is used
+    # instead of a custom guild emoji" — skip the check in that case.
     react_emoji_id = config.channels["availability_reaction"]
-    emoji = discord.utils.get(guild.emojis, id=react_emoji_id)
-    if emoji is None:
-        reporter.record(FAIL, "emoji", "availability_reaction", f"id={react_emoji_id} not in guild emoji")
+    if react_emoji_id == 0:
+        reporter.record(SKIP, "emoji", "availability_reaction", "(staging Unicode sentinel: 0)")
     else:
-        reporter.record(OK, "emoji", "availability_reaction", f":{emoji.name}:")
+        emoji = discord.utils.get(guild.emojis, id=react_emoji_id)
+        if emoji is None:
+            reporter.record(FAIL, "emoji", "availability_reaction", f"id={react_emoji_id} not in guild emoji")
+        else:
+            reporter.record(OK, "emoji", "availability_reaction", f":{emoji.name}:")
 
     # spoiler_role is a role id under the channels dict (legacy naming)
     check_role(reporter, guild, "channels.spoiler_role", config.channels["spoiler_role"])

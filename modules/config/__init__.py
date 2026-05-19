@@ -21,8 +21,14 @@ _use_staging = bool(_env.get("STAGING_IDS") or os.getenv("STAGING_IDS"))
 if _use_staging:
     from modules.config.ids_staging import (  # type: ignore[import-not-found]
         FORUM_CHANNEL_TAG_IDS,
+        INTERESTED_MESSAGE_BASE,
+        INTERESTED_MESSAGE_STAR,
+        INTERESTED_MESSAGE_ULTIMATE,
         OWNER_ID,
         REACTION_ROLES,
+        RELATIONS_CHANNEL_ID,
+        VERIFICATION_FORUM_ID,
+        WARDROBE_CHANNEL_ID,
         channels,
         emoji,
         roles,
@@ -30,8 +36,14 @@ if _use_staging:
 else:
     from modules.config.ids import (
         FORUM_CHANNEL_TAG_IDS,
+        INTERESTED_MESSAGE_BASE,
+        INTERESTED_MESSAGE_STAR,
+        INTERESTED_MESSAGE_ULTIMATE,
         OWNER_ID,
         REACTION_ROLES,
+        RELATIONS_CHANNEL_ID,
+        VERIFICATION_FORUM_ID,
+        WARDROBE_CHANNEL_ID,
         channels,
         emoji,
         roles,
@@ -51,4 +63,10 @@ __all__ = [
     'OWNER_ID',
     'REACTION_ROLES',
     'FORUM_CHANNEL_TAG_IDS',
+    'VERIFICATION_FORUM_ID',
+    'RELATIONS_CHANNEL_ID',
+    'WARDROBE_CHANNEL_ID',
+    'INTERESTED_MESSAGE_BASE',
+    'INTERESTED_MESSAGE_STAR',
+    'INTERESTED_MESSAGE_ULTIMATE',
 ]

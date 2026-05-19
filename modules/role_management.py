@@ -6,7 +6,7 @@ from collections import defaultdict
 import discord
 from modules import config
 
-RELATIONS_CHANNEL_ID = 1503134832719302866
+RELATIONS_CHANNEL_ID = config.RELATIONS_CHANNEL_ID
 _role_relations: dict[int, list[int]] = {}
 
 # Serialise RoleSession.commit() per member so concurrent contexts (e.g.
