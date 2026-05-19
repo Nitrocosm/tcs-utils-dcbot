@@ -15,11 +15,11 @@ from modules import activity, badges, general, role_management, verification
 
 log = logging.getLogger(__name__)
 
-VERSION = 'v5.1.1-3'
+VERSION = 'v5.1.3-2'
 
 CHANGELOG = f"""
 ## {VERSION} changelog
-- fix a small thing
+- change literally 2 characters
 """
 
 

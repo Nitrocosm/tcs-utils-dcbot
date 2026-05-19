@@ -268,8 +268,9 @@ class ServerEventsCog(commands.Cog):
                 if entry.target == member and \
                     (discord.utils.utcnow() - entry.created_at).total_seconds() < 5:
                         await general.send(config.message('kick', mention=member.mention, display=member.nick))
+                        reason_suffix = f' for {entry.reason}' if entry.reason else ''
                         await general.send(
-                            f':information_source:<:kick:1439803052826689537> {member.mention} ({member.display_name}) got kicked',
+                            f':information_source:<:kick:1439803052826689537> {member.mention} ({member.display_name}) got kicked{reason_suffix}',
                             'mod_chat')
                         return
 
@@ -277,8 +278,9 @@ class ServerEventsCog(commands.Cog):
                 if entry.target == member and \
                     (discord.utils.utcnow() - entry.created_at).total_seconds() < 5:
                         await general.send(config.message('ban', mention=member.mention, display=member.nick))
+                        reason_suffix = f' for {entry.reason}' if entry.reason else ''
                         await general.send(
-                            f':information_source:<:ban:1438882547588141118> {member.mention} ({member.display_name}) got banned',
+                            f':information_source:<:ban:1438882547588141118> {member.mention} ({member.display_name}) got banned{reason_suffix}',
                             'mod_chat')
                         return
 

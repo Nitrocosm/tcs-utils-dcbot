@@ -88,6 +88,17 @@ class ModerationCog(commands.Cog):
     @general.has_perms('kick_members')
     @general.can_moderate_member
     async def kick(self, ctx, member: discord.Member = None, *, reason: str = None):
+        try:
+            await member.send(
+                f'hey there! you got kicked from **these challenges suck** for the following reason:\n'
+                f'> {reason}\n'
+                f'\n'
+                f"this isn't a ban. [you can freely reapply to the server at any point if you wish!](https://discord.gg/AU2yAuXJQ7)"
+            )
+            await ctx.send('-# sent the kicked guy a dm btw')
+        except discord.HTTPException:
+            log.warning("kick: failed to DM kicked member", exc_info=True)
+            await ctx.send('-# couldnt send the guy a dm bc discord dumb asf')
         await member.kick(reason=reason)
 
     @commands.command()
