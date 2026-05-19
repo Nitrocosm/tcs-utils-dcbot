@@ -36,16 +36,11 @@ log = logging.getLogger(__name__)
 
 
 async def _on_join_request_create(payload: dict):
-    """Fires when someone submits a join application (status: PENDING)."""
-    user = payload.get("user", {})
-    user_id = user.get("id")
-    username = user.get("global_name") or user.get("username", "unknown")
-    request_id = payload.get("id")
+    """Fires when someone submits a join application (status: PENDING).
 
-    # await general.send(
-    #     f'<:application_add:1501552015816527963> <@{user_id}> ({username}) sent a join application',
-    #     'mod_chat'
-    # )
+    The payload's user / id fields are intentionally not extracted here yet;
+    the per-user announcement is commented out (above) until we want it back.
+    """
     await general.send(
         '<:application_add:1501552015816527963> we got a new join application!',
         'mod_chat',
@@ -59,7 +54,6 @@ async def _on_join_request_delete(payload: dict):
     Otherwise, the applicant likely withdrew themself.
     """
     user_id = payload.get("user_id")
-    request_id = payload.get("id")
     actioned_by = payload.get("actioned_by_user") or {}
     actioned_by_id = actioned_by.get("id")
 

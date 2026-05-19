@@ -130,7 +130,7 @@ class CoreCog(commands.Cog):
     @general.try_bot_perms
     @general.has_perms('owner')
     async def update(self, ctx):
-        msg = await ctx.send(':radio_button: pulling from git...')
+        await ctx.send(':radio_button: pulling from git...')
         try:
             result = subprocess.run(
                 ['git', 'pull'],

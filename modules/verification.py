@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import re
@@ -163,7 +162,6 @@ async def _check_youtube_video(video_id: str) -> str:
                     return 'available' if resp.status == 200 else 'uploading'
                 playability = data.get('playabilityStatus', {})
                 status = playability.get('status', 'ERROR')
-                reason = playability.get('reason', '') or playability.get('errorScreen', {}).get('reason', '')
                 if status == 'OK':
                     return 'available'
                 return 'uploading'

@@ -1,7 +1,6 @@
 """SavesCog — saved-group commands: save, rename, disband."""
 import logging
 
-import discord
 from discord.ext import commands
 
 from modules import general

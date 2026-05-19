@@ -1,10 +1,11 @@
 import asyncio
+import functools
 import logging
+
 import discord
 from discord import Guild
 from discord.ext import commands
 from modules import config
-from modules.config import TARGET_GUILD
 from modules.bot_init import bot
 
 log = logging.getLogger(__name__)
@@ -135,11 +136,6 @@ def emojify(text: str, color: str = '') -> str:
     for char in text:
         converted_text += config.emoji[f'{char}{color}']
     return "".join(converted_text)
-
-
-
-
-import functools
 
 
 def _find_ctx(args: tuple) -> commands.Context:
