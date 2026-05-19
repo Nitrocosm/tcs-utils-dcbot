@@ -9,7 +9,16 @@ file once with ``scripts/setup_staging.py <guild_id>``.
 """
 import os
 
-if os.getenv("STAGING_IDS"):
+from dotenv import dotenv_values
+
+# Check both .env file and shell env. Must read .env directly because nothing
+# has called load_dotenv() yet at this point in startup — the bot's first
+# `from modules import config` import runs before main.py's logging_config
+# (which is where dotenv would normally get loaded).
+_env = dotenv_values(".env")
+_use_staging = bool(_env.get("STAGING_IDS") or os.getenv("STAGING_IDS"))
+
+if _use_staging:
     from modules.config.ids_staging import (  # type: ignore[import-not-found]
         FORUM_CHANNEL_TAG_IDS,
         OWNER_ID,
