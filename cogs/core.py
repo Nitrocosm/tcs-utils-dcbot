@@ -7,6 +7,7 @@ task loop (which depends on the cache being built first), the global
 """
 import logging
 import subprocess
+import sys
 
 import discord
 from discord.ext import commands, tasks
@@ -15,11 +16,15 @@ from modules import activity, badges, general, role_management, verification
 
 log = logging.getLogger(__name__)
 
-VERSION = 'v5.1.3-2'
+VERSION = 'v6.0.0'
 
 CHANGELOG = f"""
 ## {VERSION} changelog
-- change literally 2 characters
+- huge refactor: god-file main.py → 8 cogs, modules/ pure logic
+- config.py split into a package; module-level IDs centralised
+- ruff + pytest + GitHub Actions CI; 156 tests
+- .update now runs `pip install -r requirements.txt` before the restart
+- countless bug fixes; see REFACTOR.md
 """
 
 
@@ -145,11 +150,34 @@ class CoreCog(commands.Cog):
             for line in res:
                 text = f'{text}\n-# {line}'
             await ctx.send(content=f':radio_button: pulled from git!{text}')
+
+            # Refresh dependencies before restarting. Uses sys.executable so we
+            # always hit the same venv the bot is currently running in. pip is
+            # fast when everything is already at the pinned version; skipping
+            # this can leave the bot in an uninstallable state after a
+            # requirements.txt change.
+            await ctx.send(content=':radio_button: syncing dependencies...')
+            pip_result = subprocess.run(
+                [sys.executable, '-m', 'pip', 'install', '-r', 'requirements.txt', '--quiet'],
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+            if pip_result.returncode != 0:
+                err_tail = pip_result.stderr[-1500:] if pip_result.stderr else '(no stderr)'
+                return await ctx.send(
+                    content=(
+                        ':warning: pip install failed — NOT restarting\n'
+                        f'```{err_tail}```'
+                    )
+                )
+            await ctx.send(content=':radio_button: dependencies in sync!')
+
             await ctx.send(content=':radio_button: restarting bot...')
             subprocess.Popen(['systemctl', 'restart', '--user', 'tcs-utils-dcbot'])
 
         except subprocess.TimeoutExpired:
-            await ctx.send(content=':x: git pull timed out')
+            await ctx.send(content=':x: git pull or pip install timed out')
         except Exception as e:
             await ctx.send(content=f':x: error: ```{e}```')
 
