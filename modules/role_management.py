@@ -1,5 +1,6 @@
 import asyncio
 import re
+import time
 from collections import defaultdict
 
 import discord
@@ -13,6 +14,23 @@ _role_relations: dict[int, list[int]] = {}
 # clobber each other on member.edit(roles=...). The dict grows unbounded for
 # the lifetime of the process; for a single small guild that's negligible.
 _member_locks: defaultdict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+# Cache of `_get_role_hierarchy(guild)` keyed by guild.id. The hierarchy only
+# changes when category roles are created/renamed/moved — operations on the
+# order of minutes-to-days apart. RoleSession.commit() can fire many times per
+# minute, so caching avoids re-sorting and re-scanning every guild role on
+# every role change. A 30 s TTL keeps the worst-case staleness window short,
+# and `load_role_relations` flushes the cache explicitly when state refreshes.
+_HIERARCHY_TTL_SECONDS = 30.0
+_hierarchy_cache: dict[int, tuple[float, dict]] = {}
+
+
+def clear_hierarchy_cache(guild_id: int | None = None) -> None:
+    """Invalidate the role-hierarchy cache for one guild, or all."""
+    if guild_id is None:
+        _hierarchy_cache.clear()
+    else:
+        _hierarchy_cache.pop(guild_id, None)
 
 
 # ── relation loading ────────────────────────────────────────────────────────
@@ -54,6 +72,8 @@ async def load_role_relations(bot: discord.Client) -> None:
             combined.setdefault(parent, []).extend(children)
 
     _role_relations = combined
+    # Role topology may have shifted while we were offline; drop stale cache.
+    clear_hierarchy_cache()
 
 
 # ── internal helpers ────────────────────────────────────────────────────────
@@ -61,6 +81,11 @@ async def load_role_relations(bot: discord.Client) -> None:
 
 def _get_role_hierarchy(guild: discord.Guild):
     # categories[category_role] = { 'roles': [list], 'none_role': discord.Role or None }
+    now = time.monotonic()
+    cached = _hierarchy_cache.get(guild.id)
+    if cached and now - cached[0] < _HIERARCHY_TTL_SECONDS:
+        return cached[1]
+
     categories = {}
     current_category = None
 
@@ -83,6 +108,7 @@ def _get_role_hierarchy(guild: discord.Guild):
             else:
                 categories[current_category]["roles"].append(role)
 
+    _hierarchy_cache[guild.id] = (now, categories)
     return categories
 
 

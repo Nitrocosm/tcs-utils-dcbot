@@ -287,6 +287,13 @@ class ServerEventsCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_socket_raw_receive(self, msg: str):
+        # Cheap substring gate: this handler ONLY cares about the two
+        # GUILD_JOIN_REQUEST_* events, which are rare. Skipping json.loads
+        # on every gateway packet (MESSAGE_CREATE, TYPING_START, voice
+        # state, presence, etc.) is a substantial CPU win in busy guilds.
+        if not isinstance(msg, str) or "GUILD_JOIN_REQUEST" not in msg:
+            return
+
         try:
             data = json.loads(msg)
         except (json.JSONDecodeError, TypeError):
