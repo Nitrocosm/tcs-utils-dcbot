@@ -88,8 +88,15 @@ class ActivityCog(commands.Cog):
 
         await general.update_status(self.bot)
 
-    @commands.Cog.listener()
-    async def on_raw_reaction_add(self, payload):
+    async def _handle_raw_reaction(self, payload, *, added: bool):
+        """Shared body for on_raw_reaction_add / on_raw_reaction_remove.
+
+        The two events do the same work except for three symmetric pairs:
+            availability: add_availability  vs remove_availability
+            debounce state: ['added'].add+['removed'].discard  vs the inverse
+            static reaction role: rs.add(...) vs rs.remove(...)
+        Branch on ``added`` for each.
+        """
         if payload.user_id == self.bot.user.id:
             return
         activity.update_cache(payload.user_id)
@@ -102,7 +109,10 @@ class ActivityCog(commands.Cog):
             # availability logic
             if payload.message_id == config.channels['availability_message']:
                 if payload.emoji.id == config.channels['availability_reaction']:
-                    await activity.add_availability(rs, member)
+                    if added:
+                        await activity.add_availability(rs, member)
+                    else:
+                        await activity.remove_availability(rs, member)
 
             # interested roles logic (tiered) - don't commit immediately
             interested_msgs = [
@@ -126,8 +136,12 @@ class ActivityCog(commands.Cog):
                     state = activity.user_pending_changes.setdefault(
                         payload.user_id, {'added': set(), 'removed': set()}
                     )
-                    state['added'].add(role)
-                    state['removed'].discard(role)
+                    if added:
+                        state['added'].add(role)
+                        state['removed'].discard(role)
+                    else:
+                        state['removed'].add(role)
+                        state['added'].discard(role)
                     await activity.schedule_interested_debounce(payload.user_id, guild)
                     return  # don't commit yet
 
@@ -135,56 +149,19 @@ class ActivityCog(commands.Cog):
             if payload.message_id in config.REACTION_ROLES:
                 emoji_str = str(payload.emoji)
                 if emoji_str in config.REACTION_ROLES[payload.message_id]:
-                    rs.add(config.REACTION_ROLES[payload.message_id][emoji_str])
+                    role_id = config.REACTION_ROLES[payload.message_id][emoji_str]
+                    if added:
+                        rs.add(role_id)
+                    else:
+                        rs.remove(role_id)
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload):
+        await self._handle_raw_reaction(payload, added=True)
 
     @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload):
-        if payload.user_id == self.bot.user.id:
-            return
-        activity.update_cache(payload.user_id)
-        guild = self.bot.get_guild(payload.guild_id)
-        member = guild.get_member(payload.user_id)
-        if not member or member.bot:
-            return
-
-        async with RoleSession(member) as rs:
-            # availability logic
-            if payload.message_id == config.channels['availability_message']:
-                if payload.emoji.id == config.channels['availability_reaction']:
-                    await activity.remove_availability(rs, member)
-
-            # interested roles logic (tiered) - don't commit immediately
-            interested_msgs = [
-                activity.INTERESTED_MESSAGE_BASE,
-                activity.INTERESTED_MESSAGE_STAR,
-                activity.INTERESTED_MESSAGE_ULTIMATE,
-            ]
-            if payload.message_id in interested_msgs:
-                role_map = activity.get_interested_role_map(guild, payload.message_id)
-                emoji_str = str(payload.emoji)
-                if emoji_str in role_map:
-                    role = role_map[emoji_str]
-
-                    # track initial state if first change
-                    if payload.user_id not in activity.user_initial_states:
-                        activity.user_initial_states[payload.user_id] = {
-                            r for r in role_map.values() if r in member.roles
-                        }
-
-                    # update debounce state
-                    state = activity.user_pending_changes.setdefault(
-                        payload.user_id, {'added': set(), 'removed': set()}
-                    )
-                    state['removed'].add(role)
-                    state['added'].discard(role)
-                    await activity.schedule_interested_debounce(payload.user_id, guild)
-                    return  # don't commit yet
-
-            # static reaction roles
-            if payload.message_id in config.REACTION_ROLES:
-                emoji_str = str(payload.emoji)
-                if emoji_str in config.REACTION_ROLES[payload.message_id]:
-                    rs.remove(config.REACTION_ROLES[payload.message_id][emoji_str])
+        await self._handle_raw_reaction(payload, added=False)
 
     # ── helpers ─────────────────────────────────────────────────────────────
 
