@@ -3,7 +3,7 @@ import asyncio
 import discord
 from discord import VoiceChannel
 from discord.ext import commands, tasks
-from modules import config, activity, moderation, general, badges, role_management, verification
+from modules import config, activity, moderation, general, badges, role_management, verification, logging_config
 from modules.config import TARGET_GUILD
 from modules.general import timed_delete_msg, send_timed_delete_msg
 from modules.role_management import RoleSession
@@ -11,6 +11,7 @@ from modules.saves import create_save, disband_save, rename_save
 from modules.points import calculate_points, get_ranked_leaderboard, update_leaderboard_message, parse_challenge_role, get_member_rank, has_all_challenges, LB_EMOJI
 from modules.bot_init import bot
 
+logging_config.setup()
 
 ################################################################
 
@@ -204,12 +205,8 @@ async def on_voice_state_update(member, before, after):
     await general.update_status(bot)
 
 
-# Reaction Roles - easy hot-swap
-REACTION_ROLES = {
-    1451676590558937221: {  # message_id
-        "⚠️": 1451675068114669740,  # emoji: role_id
-    }
-}
+# Reaction roles are configured in modules/config/ids.py
+REACTION_ROLES = config.REACTION_ROLES
 
 
 @bot.event
@@ -341,7 +338,7 @@ async def on_member_update(before, after):
             old_rank = get_member_rank(after.guild, before)
             challenge_changed = False
 
-            log_thread = after.guild.get_thread(1457200972215484417)
+            log_thread = after.guild.get_thread(config.channels['challenge_log_thread'])
 
             for role in added_roles:
                 role_info = parse_challenge_role(role)
@@ -679,7 +676,7 @@ async def on_message(message: discord.Message):
         global pings
         if not pings:
             if isinstance(message.author, discord.Member):
-                if '<@534097411048603648>' in message.content:
+                if f'<@{config.OWNER_ID}>' in message.content:
                     await message.reply(
                         "*note: lostya marked themself temporarily unavailable. they will come back to the ping later.*\n"
                         "*in the meanwhile, try pinging one of the other available mods instead.*\n"
@@ -736,9 +733,8 @@ async def on_message(message: discord.Message):
         await bot.process_commands(message)
 
 
-FORUM_CHANNEL_TAG_IDS = {1443764605695557753: 1456989366076313773,
-                         1465308641757364397: 1467173431605985331}
-ROLE_ID = 1466886852039671962
+# Forum auto-tag mapping is configured in modules/config/ids.py
+FORUM_CHANNEL_TAG_IDS = config.FORUM_CHANNEL_TAG_IDS
 
 @bot.event
 async def on_thread_create(thread: discord.Thread):
@@ -758,7 +754,7 @@ async def on_thread_create(thread: discord.Thread):
             current_tags.append(tag)
             await thread.edit(applied_tags=current_tags)
 
-    await thread.send(f"<@&{ROLE_ID}> new challenge to verify")
+    await thread.send(f"<@&{config.roles['verifier']}> new challenge to verify")
     #------------------------------------
 
 
@@ -1775,4 +1771,4 @@ async def on_audit_log_entry_create(entry: discord.AuditLogEntry):
             await general.send(config.message('edit_vc_3_clear', member=entry.user.mention), pings=discord.AllowedMentions.none())
 
 if __name__ == '__main__':
-    bot.run(config.TOKEN)
+    bot.run(config.TOKEN, log_handler=None)

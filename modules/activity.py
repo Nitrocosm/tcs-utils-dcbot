@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 import datetime
 
@@ -9,6 +10,8 @@ from modules import config, general
 from modules.general import has_role, send, count_available, count_in_vc, emojify
 from modules.role_management import RoleSession
 from modules.bot_init import bot
+
+log = logging.getLogger(__name__)
 
 async def voice_check(rs: RoleSession, member: discord.Member) -> None:
     async def check(
@@ -168,7 +171,7 @@ async def check_all_members() -> None:
         if not member.bot:
             async with RoleSession(member) as rs:
                 await full_check_member(rs, member)
-        print(f'checking members - {round(i * 100 / total, 1)}%')
+        log.debug('checking members - %s%%', round(i * 100 / total, 1))
 
     await general.update_status(status=discord.Status.online)  # type: ignore
 
@@ -198,7 +201,7 @@ async def build_activity_cache() -> None:
     guild = bot.get_guild(config.TARGET_GUILD)
     chat = bot.get_channel(config.channels['chat'])
 
-    print('building activity cache...')
+    log.info('building activity cache...')
     async for msg in chat.history(limit=10000):
         ts = msg.created_at.timestamp()
 
@@ -211,7 +214,7 @@ async def build_activity_cache() -> None:
                     if ts > last_activity_cache.get(user_id, 0):
                         update_cache(user_id, ts)
 
-    print(f'cache built — tracked {len(last_activity_cache)} members.')
+    log.info('cache built — tracked %d members.', len(last_activity_cache))
 
 
 async def run_activity_checks() -> None:
@@ -402,5 +405,5 @@ async def sync_interested_reactions() -> None:
             for emoji_str in sorted_emojis:
                 if emoji_str not in existing:
                     await msg.add_reaction(emoji_str)
-        except Exception as e:
-            print(f'sync error for {mid}: {e}')
+        except Exception:
+            log.warning('sync error for %s', mid, exc_info=True)

@@ -1,7 +1,11 @@
-import discord
 import datetime
+import logging
+
+import discord
 from modules import config
 from modules.role_management import RoleSession
+
+log = logging.getLogger(__name__)
 
 
 def get_timeout_duration(duration: str) -> datetime.timedelta:
@@ -55,7 +59,7 @@ def format_timedelta(timedelta: datetime.timedelta) -> str:
 async def unmute(ctx, member: discord.Member, reason: str = None):
     await member.timeout(None, reason=reason) # Setting duration to None removes timeout
     await ctx.send(f"unmuted :white_check_mark:")
-    print(f"Unmuted {member.display_name} (ID: {member.id}) by {ctx.author.display_name} for: {reason}")
+    log.info('unmuted %s (ID: %s) by %s for: %s', member.display_name, member.id, ctx.author.display_name, reason)
 
 
 async def warn(ctx, member: discord.Member, reason: str = None):
