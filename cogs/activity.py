@@ -86,7 +86,7 @@ class ActivityCog(commands.Cog):
                 allowed_mentions=discord.AllowedMentions.none(),
             )
 
-        await general.update_status(self.bot)
+        await general.update_status()
 
     async def _handle_raw_reaction(self, payload, *, added: bool):
         """Shared body for on_raw_reaction_add / on_raw_reaction_remove.

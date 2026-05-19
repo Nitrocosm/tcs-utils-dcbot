@@ -12,10 +12,12 @@ log = logging.getLogger(__name__)
 
 async def send(msg: str, where: str = 'chat', pings: discord.AllowedMentions = None) -> discord.Message:
     channel = bot.get_channel(config.channels[where])
-    if channel:
-        msg = await channel.send(msg, allowed_mentions=pings)
-    await update_status(bot)
-    return msg
+    if channel is None:
+        log.error("channel %r (id=%s) not available", where, config.channels.get(where))
+        raise RuntimeError(f"channel {where!r} not available")
+    sent = await channel.send(msg, allowed_mentions=pings)
+    await update_status()
+    return sent
 
 async def timed_delete_msg(msg: discord.Message, text: str, duration: int = 10):
     for i in range(1, duration):

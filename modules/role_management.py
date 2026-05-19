@@ -1,10 +1,18 @@
+import asyncio
 import re
+from collections import defaultdict
 
 import discord
 from modules import config
 
 RELATIONS_CHANNEL_ID = 1503134832719302866
 _role_relations: dict[int, list[int]] = {}
+
+# Serialise RoleSession.commit() per member so concurrent contexts (e.g.
+# on_member_update firing while on_voice_state_update is mid-commit) don't
+# clobber each other on member.edit(roles=...). The dict grows unbounded for
+# the lifetime of the process; for a single small guild that's negligible.
+_member_locks: defaultdict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 
 
 # ── relation loading ────────────────────────────────────────────────────────
@@ -249,21 +257,22 @@ class RoleSession:
 
 
     async def commit(self):
-        fresh_member = self.guild.get_member(self.member.id)
-        if not fresh_member:
-            return
+        async with _member_locks[self.member.id]:
+            fresh_member = self.guild.get_member(self.member.id)
+            if not fresh_member:
+                return
 
-        final_roles = self._build_final_roles(fresh_member)
+            final_roles = self._build_final_roles(fresh_member)
 
-        if not self.member.bot:
-            final_roles = _apply_role_relations(final_roles, self.guild)
-            final_roles = _ensure_roles(final_roles, self.guild)
-            final_roles = _fix_categories(final_roles, self.guild)
-        else:
-            final_roles = self._apply_bot_roles(final_roles)
+            if not self.member.bot:
+                final_roles = _apply_role_relations(final_roles, self.guild)
+                final_roles = _ensure_roles(final_roles, self.guild)
+                final_roles = _fix_categories(final_roles, self.guild)
+            else:
+                final_roles = self._apply_bot_roles(final_roles)
 
-        if final_roles != set(fresh_member.roles):
-            await fresh_member.edit(roles=list(final_roles))
+            if final_roles != set(fresh_member.roles):
+                await fresh_member.edit(roles=list(final_roles))
 
 
     # async def commit_with_relations(self):

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import re
 import time
 from typing import Optional
@@ -15,6 +16,8 @@ from modules.bot_init import bot
 from modules.points import parse_challenge_role
 from modules.role_management import RoleSession
 from modules.badges import DIFFICULTY_PLACEHOLDERS, badge_emoji_for_name as _badge_emoji, points_to_difficulty
+
+log = logging.getLogger(__name__)
 
 VM = config.verification_messages
 
@@ -164,7 +167,8 @@ async def _check_youtube_video(video_id: str) -> str:
                 if status == 'OK':
                     return 'available'
                 return 'uploading'
-    except Exception:
+    except Exception as e:
+        log.debug('youtube check failed: %s', e)
         return 'uploading'
 
 async def _set_tags(thread: discord.Thread, tag_ids: list[int]):
@@ -381,8 +385,8 @@ async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: d
             final_lines.append("")
             final_lines.append(VM["verif_done_bot"].format(role_mention=role_mention))
             await bot_msg.edit(content="\n".join(final_lines), view=None, allowed_mentions=AllowedMentions.none())
-        except:
-            pass
+        except discord.HTTPException:
+            log.warning("verification: HTTP error swallowed", exc_info=True)
     await thread.edit(archived=True, locked=True)
     _clean_state(thread.id)
 
@@ -410,7 +414,7 @@ async def on_verification_message(message: discord.Message):
     _save_state()
     try:
         bot_msg = await message.channel.fetch_message(state['message_id'])
-    except:
+    except discord.HTTPException:
         return
     await _process_video(video_id, message.channel, state, bot_msg)
 
@@ -435,7 +439,7 @@ async def on_verification_message_edit(before: discord.Message, after: discord.M
     _save_state()
     try:
         bot_msg = await after.channel.fetch_message(state['message_id'])
-    except:
+    except discord.HTTPException:
         return
     await _process_video(video_id, after.channel, state, bot_msg)
 
@@ -621,15 +625,15 @@ class ChallengeMenuView(View):
                 new_name = f"[JOKE BADGE] {new_name}"
             try:
                 await thread.edit(name=new_name)
-            except:
-                pass
+            except discord.HTTPException:
+                log.warning("verification: HTTP error swallowed", exc_info=True)
         content = _build_challenge_message(state, interaction.guild)
         view = ChallengeConfirmView()
         await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping())
         if isinstance(thread, discord.Thread):
             try:
                 starter = await thread.fetch_message(thread.id)
-            except:
+            except discord.HTTPException:
                 starter = None
             if starter:
                 await _handle_video_check(starter, thread, state, interaction.message)
@@ -700,7 +704,7 @@ class OwnerVerifyPromptView(View):
         mention = interaction.user.mention
         try:
             bot_msg = await thread.fetch_message(state['message_id'])
-        except:
+        except discord.HTTPException:
             await interaction.response.edit_message(content=VM["err_no_bot_msg"], view=None)
             return
         await interaction.response.edit_message(content=VM["info_proceeding"], view=None)
@@ -723,7 +727,7 @@ class OwnerVerifySelfView(View):
         mention = interaction.user.mention
         try:
             bot_msg = await thread.fetch_message(state['message_id'])
-        except:
+        except discord.HTTPException:
             await interaction.response.edit_message(content=VM["err_no_bot_msg"], view=None)
             return
         await interaction.response.edit_message(content=VM["info_proceeding"], view=None)
@@ -813,7 +817,7 @@ class VerificationView(View):
         thread = interaction.channel
         try:
             bot_msg = await thread.fetch_message(state['message_id'])
-        except:
+        except discord.HTTPException:
             await interaction.response.send_message(VM["err_no_bot_msg"], ephemeral=True)
             return
 
@@ -898,8 +902,8 @@ class ReportConfirmView(View):
         main_msg = thread.get_partial_message(state['message_id'])
         try:
             await main_msg.edit(content=content, view=ReportResolveView())
-        except:
-            pass
+        except discord.HTTPException:
+            log.warning("verification: HTTP error swallowed", exc_info=True)
         await thread.send(VM["report_notify"].format(MOD_ROLE_ID=MOD_ROLE_ID, role_mention=role_mention))
 
     @discord.ui.button(label=VM["btn_cancel"], style=discord.ButtonStyle.secondary)
@@ -960,8 +964,8 @@ class RejectConfirmView(View):
         main_msg = thread.get_partial_message(state['message_id'])
         try:
             await main_msg.edit(content=content, view=RejectResolveView())
-        except:
-            pass
+        except discord.HTTPException:
+            log.warning("verification: HTTP error swallowed", exc_info=True)
         await thread.send(VM["reject_notify"].format(mention=interaction.user.mention))
         await thread.edit(archived=True, locked=True)
         _clean_state(thread.id)
@@ -1068,13 +1072,13 @@ async def video_polling_loop():
                 if not isinstance(thread, discord.Thread):
                     try:
                         thread = await bot.fetch_channel(s['thread_id'])
-                    except:
+                    except discord.HTTPException:
                         continue
                     if not isinstance(thread, discord.Thread):
                         continue
                 try:
                     msg = await thread.fetch_message(s['message_id'])
-                except:
+                except discord.HTTPException:
                     continue
                 s['video_ready'] = True
                 _save_state()
@@ -1091,10 +1095,10 @@ async def video_polling_loop():
                     msg = await thread.fetch_message(s['message_id'])
                     content = _build_challenge_message(s, thread.guild)
                     await msg.edit(content=content, allowed_mentions=_no_ping(), suppress=True)
-                except:
-                    pass
+                except discord.HTTPException:
+                    log.warning("verification: HTTP error swallowed", exc_info=True)
         except Exception:
-            pass  # keep the loop alive on transient errors
+            log.exception("video_polling_loop: transient error swallowed; loop continues")
 
 
 # ── Restore ─────────────────────────────────────────────────────────────────
@@ -1128,8 +1132,8 @@ async def restore_sessions(client: discord.Client):
         if not isinstance(thread, discord.Thread):
             try:
                 thread = await guild.fetch_channel(s['thread_id'])
-            except:
-                pass
+            except discord.HTTPException:
+                log.warning("verification: HTTP error swallowed", exc_info=True)
             if not isinstance(thread, discord.Thread):
                 _state.pop(key, None)
                 _save_state()
@@ -1158,11 +1162,11 @@ async def restore_sessions(client: discord.Client):
             continue
         try:
             bot_msg = await thread.fetch_message(s['message_id'])
-        except:
+        except discord.HTTPException:
             continue
         s['video_ready'] = True
         _save_state()
         try:
             await _enter_verification_phase(thread, s, bot_msg)
         except Exception:
-            pass
+            log.exception("restore_sessions: failed to restore one verification session")
