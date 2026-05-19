@@ -11,6 +11,9 @@ import os
 
 from dotenv import dotenv_values
 
+from modules.config.messages import message, verification_messages
+from modules.config.settings import TARGET_GUILD, TOKEN, check_guild
+
 # Check both .env file and shell env. Must read .env directly because nothing
 # has called load_dotenv() yet at this point in startup — the bot's first
 # `from modules import config` import runs before main.py's logging_config
@@ -48,8 +51,6 @@ else:
         emoji,
         roles,
     )
-from modules.config.messages import message, verification_messages
-from modules.config.settings import TARGET_GUILD, TOKEN, check_guild
 
 __all__ = [
     'TARGET_GUILD',
