@@ -523,7 +523,7 @@ def write_ids_file(
         ("chat", cids.get("chat", 0)),
         ("availability", cids.get("availability", 0)),
         ("availability_message", mids.get("availability_message", 0)),
-        ("availability_reaction", 0),  # placeholder — Unicode emoji used instead
+        ("availability_reaction", "✅"),  # Unicode glyph — matches_availability_emoji handles both int snowflake (prod) and str (staging)
         ("ps_link", cids.get("ps_link", 0)),
         ("best_runs", cids.get("best_runs", 0)),
         ("mod_chat", cids.get("mod_chat", 0)),
@@ -536,7 +536,9 @@ def write_ids_file(
         ("challenge_log_thread", cids.get("challenge_log_thread", 0)),
     ]
     for key, val in chan_pairs:
-        L(f"    {key!r}: {val},")
+        # !r on val so string values (Unicode emoji glyphs) get quoted properly
+        # while ints render as bare numeric literals.
+        L(f"    {key!r}: {val!r},")
     L("}")
     L("")
     L("")

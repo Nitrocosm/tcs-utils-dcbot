@@ -132,7 +132,7 @@ async def availability_check(rs: RoleSession, member: discord.Member) -> None:
 
     found_reaction = None
     for reaction in msg.reactions:
-        if reaction.emoji.id == config.channels['availability_reaction']:
+        if general.matches_availability_emoji(reaction.emoji):
             found_reaction = reaction
             break
 

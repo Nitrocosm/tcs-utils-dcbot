@@ -172,16 +172,17 @@ async def run_checks(client: discord.Client) -> int:
         config.channels["availability_message"],
     )
 
-    # availability_reaction is a custom-emoji id; check it's present in the guild.
-    # Staging mode writes 0 here as a sentinel meaning "Unicode emoji is used
-    # instead of a custom guild emoji" — skip the check in that case.
-    react_emoji_id = config.channels["availability_reaction"]
-    if react_emoji_id == 0:
-        reporter.record(SKIP, "emoji", "availability_reaction", "(staging Unicode sentinel: 0)")
+    # availability_reaction may be a custom-emoji id (production) or a Unicode
+    # glyph string (staging — matches_availability_emoji handles both).
+    react_emoji = config.channels["availability_reaction"]
+    if isinstance(react_emoji, str):
+        reporter.record(OK, "emoji", "availability_reaction", f"Unicode glyph {react_emoji!r}")
+    elif not react_emoji:
+        reporter.record(SKIP, "emoji", "availability_reaction", "(unset)")
     else:
-        emoji = discord.utils.get(guild.emojis, id=react_emoji_id)
+        emoji = discord.utils.get(guild.emojis, id=react_emoji)
         if emoji is None:
-            reporter.record(FAIL, "emoji", "availability_reaction", f"id={react_emoji_id} not in guild emoji")
+            reporter.record(FAIL, "emoji", "availability_reaction", f"id={react_emoji} not in guild emoji")
         else:
             reporter.record(OK, "emoji", "availability_reaction", f":{emoji.name}:")
 

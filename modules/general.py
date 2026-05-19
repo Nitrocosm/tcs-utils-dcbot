@@ -52,6 +52,21 @@ async def count_filtered_members(guild: Guild) -> int:
         member_count += 1
     return member_count
 
+def matches_availability_emoji(emoji) -> bool:
+    """True if ``emoji`` is the configured availability reaction emoji.
+
+    Works whether the configured value is a custom-emoji snowflake id (int,
+    matches ``Emoji``/``PartialEmoji`` by ``.id``) or a Unicode glyph (str,
+    matches ``str`` reactions directly). Returns False when the config value
+    is the staging sentinel (``0`` or empty)."""
+    expected = config.channels['availability_reaction']
+    if not expected:
+        return False
+    if isinstance(emoji, str):
+        return emoji == expected
+    return getattr(emoji, 'id', None) == expected
+
+
 async def count_available(guild: discord.Guild) -> int:
     channel = guild.get_channel(config.channels['availability'])
     try:
@@ -60,7 +75,7 @@ async def count_available(guild: discord.Guild) -> int:
         return 0
     found_reaction: discord.Reaction | None = None
     for reaction in msg.reactions:
-        if reaction.emoji.id == config.channels['availability_reaction']:
+        if matches_availability_emoji(reaction.emoji):
             found_reaction = reaction
             break
     if not found_reaction:
