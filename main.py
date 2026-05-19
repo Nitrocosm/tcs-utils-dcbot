@@ -14,12 +14,12 @@ from modules.bot_init import bot
 
 ################################################################
 
-version = 'v5.1.3-1'
+version = 'v5.1.3-2'
 
 changelog = \
 f"""
 ## {version} changelog
-- fix verification forum pinging challenge completion owners (like actually this time) (i hope) (actually probs not bc discord is retarded but it's good to try anyway)
+- change literally 2 characters
 """
 
 ################################################################

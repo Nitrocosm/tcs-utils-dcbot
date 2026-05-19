@@ -5,7 +5,7 @@ from modules.role_management import RoleSession
 
 SAVE_COOLDOWN = {}  # {user_id: datetime.datetime of last save}
 
-SAVE_CATEGORY_NAME = "──╱ saves ╱──────────"
+SAVE_CATEGORY_NAME = "──／ saves ／──────────"
 SAVE_CHANNEL_TEMPLATE = "💾┃save-{num}"
 SAVE_ROLE_TEMPLATE = "💾 save {num}"
 
