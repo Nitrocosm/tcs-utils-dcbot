@@ -39,6 +39,10 @@ TOKEN = os.getenv("TOKEN")
 if not TOKEN:
     sys.exit("ERROR: TOKEN missing from .env")
 
+# Optional. If set, gets baked into ids_staging.py so owner-only commands work
+# without a follow-up hand edit. Read either from .env or shell env.
+STAGING_OWNER_ID = int(os.getenv("STAGING_OWNER_ID") or 0)
+
 if len(sys.argv) < 2:
     sys.exit(f"usage: {sys.argv[0]} <staging_guild_id>")
 
@@ -575,7 +579,7 @@ def write_ids_file(
 
 
         # ── Single user IDs ────────────────────────────────────────────────────
-        OWNER_ID = 0   # FIXME: set to your Discord user id for owner-only commands
+        OWNER_ID = {STAGING_OWNER_ID}{'   # FIXME: set to your Discord user id for owner-only commands' if not STAGING_OWNER_ID else ''}
 
 
         # ── Reaction roles ─────────────────────────────────────────────────────
