@@ -1,7 +1,11 @@
-import discord
 import datetime
+import logging
+
+import discord
 from modules import config
 from modules.role_management import RoleSession
+
+log = logging.getLogger(__name__)
 
 
 def get_timeout_duration(duration: str) -> datetime.timedelta:
@@ -54,8 +58,8 @@ def format_timedelta(timedelta: datetime.timedelta) -> str:
 
 async def unmute(ctx, member: discord.Member, reason: str = None):
     await member.timeout(None, reason=reason) # Setting duration to None removes timeout
-    await ctx.send(f"unmuted :white_check_mark:")
-    print(f"Unmuted {member.display_name} (ID: {member.id}) by {ctx.author.display_name} for: {reason}")
+    await ctx.send("unmuted :white_check_mark:")
+    log.info('unmuted %s (ID: %s) by %s for: %s', member.display_name, member.id, ctx.author.display_name, reason)
 
 
 async def warn(ctx, member: discord.Member, reason: str = None):
@@ -65,14 +69,14 @@ async def warn(ctx, member: discord.Member, reason: str = None):
             #await member.timeout(timeout_duration, reason=reason)
             rs.add(config.roles['warn_2'])
             rs.remove(config.roles['warn_1'])
-            await ctx.send(f"warned the guy :white_check_mark:\nwarn 2/3")
+            await ctx.send("warned the guy :white_check_mark:\nwarn 2/3")
 
         elif member.guild.get_role(config.roles['warn_2']) in member.roles:
             #timeout_duration = datetime.timedelta(days=7)
             #await member.timeout(timeout_duration, reason=reason)
             rs.add(config.roles['warn_3'])
             rs.remove(config.roles['warn_2'])
-            await ctx.send(f"warned the guy :white_check_mark:\nwarn 3/3\nnext warn will autoban them btw")
+            await ctx.send("warned the guy :white_check_mark:\nwarn 3/3\nnext warn will autoban them btw")
 
         elif member.guild.get_role(config.roles['warn_3']) in member.roles:
             await member.ban()
@@ -81,4 +85,4 @@ async def warn(ctx, member: discord.Member, reason: str = None):
             #timeout_duration = datetime.timedelta(days=1)
             rs.add(config.roles['warn_1'])
             #await member.timeout(timeout_duration, reason=reason)
-            await ctx.send(f"warned the guy :white_check_mark:\nwarn 1/3")
+            await ctx.send("warned the guy :white_check_mark:\nwarn 1/3")

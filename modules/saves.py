@@ -160,7 +160,7 @@ async def rename_save(ctx, name: str = None):
         if name:
             await ctx.send(f"renamed save to `{name}` :white_check_mark:")
         else:
-            await ctx.send(f"removed custom name :white_check_mark:")
+            await ctx.send("removed custom name :white_check_mark:")
     except discord.Forbidden:
         await ctx.send("i don't have permissions to rename this channel")
     except discord.HTTPException as e:

@@ -1,5 +1,5 @@
-import asyncio
 import json
+import logging
 import re
 import time
 from typing import Optional
@@ -14,15 +14,17 @@ from modules import config
 from modules.bot_init import bot
 from modules.points import parse_challenge_role
 from modules.role_management import RoleSession
-from modules.badges import badge_emoji_for_name as _badge_emoji
+from modules.badges import DIFFICULTY_PLACEHOLDERS, badge_emoji_for_name as _badge_emoji, points_to_difficulty
+
+log = logging.getLogger(__name__)
 
 VM = config.verification_messages
 
-VERIFICATION_FORUM_ID = 1502768684085678200
+VERIFICATION_FORUM_ID = config.VERIFICATION_FORUM_ID
 STATE_FILE = 'verification_state.json'
 
-VERIFIER_ROLE_ID = 1466886852039671962
-MOD_ROLE_ID = 1433828741548740781
+VERIFIER_ROLE_ID = config.roles['verifier']
+MOD_ROLE_ID = config.roles['mod']
 
 TAG_UPLOADING = 1502770695359303690
 TAG_NEEDS_VERIFICATION = 1502769472715358501
@@ -103,28 +105,8 @@ def _select_emoji_for_challenge(guild: discord.Guild, name: str, points: int) ->
     emoji = _badge_emoji(guild, name)
     if emoji:
         return emoji
-    diff = 0
-    if points <= 0:   diff = 0
-    elif points <= 2: diff = 1
-    elif points <= 4: diff = 2
-    elif points <= 7: diff = 3
-    elif points <= 10: diff = 4
-    elif points <= 13: diff = 5
-    elif points <= 17: diff = 6
-    elif points <= 23: diff = 7
-    else: diff = 8
-    placeholders = [
-        "<:badge_placeholder_custom_npc:1468336218407436328>",
-        "<:badge_placeholder_custom_normal:1468336216171614490>",
-        "<:badge_placeholder_custom_hard:1468336226154184867>",
-        "<:badge_placeholder_custom_insane:1468336205635784988>",
-        "<:badge_placeholder_custom_extreme:1468336223444537414>",
-        "<:badge_placeholder_custom_brutal:1468336220609314877>",
-        "<:badge_placeholder_custom_maso:1468336214124925073>",
-        "<:badge_placeholder_custom_leg:1468336228914172119>",
-        "<:badge_placeholder_custom_godlike:1468518569619886111>",
-    ]
-    m = re.match(r"<:(\w+):(\d+)>", placeholders[diff])
+    placeholder = DIFFICULTY_PLACEHOLDERS[points_to_difficulty(points)]
+    m = re.match(r"<:(\w+):(\d+)>", placeholder)
     return discord.PartialEmoji(name=m.group(1), id=int(m.group(2))) if m else None
 
 def _get_challenge_roles(guild: discord.Guild):
@@ -180,11 +162,11 @@ async def _check_youtube_video(video_id: str) -> str:
                     return 'available' if resp.status == 200 else 'uploading'
                 playability = data.get('playabilityStatus', {})
                 status = playability.get('status', 'ERROR')
-                reason = playability.get('reason', '') or playability.get('errorScreen', {}).get('reason', '')
                 if status == 'OK':
                     return 'available'
                 return 'uploading'
-    except Exception:
+    except Exception as e:
+        log.debug('youtube check failed: %s', e)
         return 'uploading'
 
 async def _set_tags(thread: discord.Thread, tag_ids: list[int]):
@@ -253,6 +235,24 @@ def _build_challenge_message(state: dict, guild: discord.Guild) -> str:
 
 def _no_ping():
     return discord.AllowedMentions.none()
+
+
+async def _check_mod(interaction: discord.Interaction) -> bool:
+    """Return True if the interaction's invoker is a mod (or the server owner).
+
+    On failure, sends the `err_not_verifier` ephemeral response so callers
+    can just `if not await _check_mod(interaction): return`.
+    """
+    member = interaction.user
+    if not isinstance(member, discord.Member):
+        member = interaction.guild.get_member(member.id)
+    mod_role = interaction.guild.get_role(MOD_ROLE_ID)
+    if not mod_role or not member or mod_role not in member.roles:
+        if not member or member.id != interaction.guild.owner_id:
+            await interaction.response.send_message(VM["err_not_verifier"], ephemeral=True)
+            return False
+    return True
+
 
 # ── Verification logic ──────────────────────────────────────────────────────
 
@@ -383,8 +383,8 @@ async def _complete_verification(thread: discord.Thread, state: dict, bot_msg: d
             final_lines.append("")
             final_lines.append(VM["verif_done_bot"].format(role_mention=role_mention))
             await bot_msg.edit(content="\n".join(final_lines), view=None, allowed_mentions=AllowedMentions.none())
-        except:
-            pass
+        except discord.HTTPException:
+            log.warning("verification: HTTP error swallowed", exc_info=True)
     await thread.edit(archived=True, locked=True)
     _clean_state(thread.id)
 
@@ -412,7 +412,7 @@ async def on_verification_message(message: discord.Message):
     _save_state()
     try:
         bot_msg = await message.channel.fetch_message(state['message_id'])
-    except:
+    except discord.HTTPException:
         return
     await _process_video(video_id, message.channel, state, bot_msg)
 
@@ -437,7 +437,7 @@ async def on_verification_message_edit(before: discord.Message, after: discord.M
     _save_state()
     try:
         bot_msg = await after.channel.fetch_message(state['message_id'])
-    except:
+    except discord.HTTPException:
         return
     await _process_video(video_id, after.channel, state, bot_msg)
 
@@ -623,15 +623,15 @@ class ChallengeMenuView(View):
                 new_name = f"[JOKE BADGE] {new_name}"
             try:
                 await thread.edit(name=new_name)
-            except:
-                pass
+            except discord.HTTPException:
+                log.warning("verification: HTTP error swallowed", exc_info=True)
         content = _build_challenge_message(state, interaction.guild)
         view = ChallengeConfirmView()
         await interaction.response.edit_message(content=content, view=view, allowed_mentions=_no_ping())
         if isinstance(thread, discord.Thread):
             try:
                 starter = await thread.fetch_message(thread.id)
-            except:
+            except discord.HTTPException:
                 starter = None
             if starter:
                 await _handle_video_check(starter, thread, state, interaction.message)
@@ -702,7 +702,7 @@ class OwnerVerifyPromptView(View):
         mention = interaction.user.mention
         try:
             bot_msg = await thread.fetch_message(state['message_id'])
-        except:
+        except discord.HTTPException:
             await interaction.response.edit_message(content=VM["err_no_bot_msg"], view=None)
             return
         await interaction.response.edit_message(content=VM["info_proceeding"], view=None)
@@ -725,7 +725,7 @@ class OwnerVerifySelfView(View):
         mention = interaction.user.mention
         try:
             bot_msg = await thread.fetch_message(state['message_id'])
-        except:
+        except discord.HTTPException:
             await interaction.response.edit_message(content=VM["err_no_bot_msg"], view=None)
             return
         await interaction.response.edit_message(content=VM["info_proceeding"], view=None)
@@ -815,7 +815,7 @@ class VerificationView(View):
         thread = interaction.channel
         try:
             bot_msg = await thread.fetch_message(state['message_id'])
-        except:
+        except discord.HTTPException:
             await interaction.response.send_message(VM["err_no_bot_msg"], ephemeral=True)
             return
 
@@ -900,8 +900,8 @@ class ReportConfirmView(View):
         main_msg = thread.get_partial_message(state['message_id'])
         try:
             await main_msg.edit(content=content, view=ReportResolveView())
-        except:
-            pass
+        except discord.HTTPException:
+            log.warning("verification: HTTP error swallowed", exc_info=True)
         await thread.send(VM["report_notify"].format(MOD_ROLE_ID=MOD_ROLE_ID, role_mention=role_mention))
 
     @discord.ui.button(label=VM["btn_cancel"], style=discord.ButtonStyle.secondary)
@@ -913,20 +913,9 @@ class ReportResolveView(View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    async def _check_mod(self, interaction: discord.Interaction) -> bool:
-        member = interaction.user
-        if not isinstance(member, discord.Member):
-            member = interaction.guild.get_member(member.id)
-        mod_role = interaction.guild.get_role(MOD_ROLE_ID)
-        if not mod_role or not member or mod_role not in member.roles:
-            if not member or member.id != interaction.guild.owner_id:
-                await interaction.response.send_message(VM["err_not_verifier"], ephemeral=True)
-                return False
-        return True
-
     @discord.ui.button(label=VM["btn_resolve"], style=discord.ButtonStyle.primary, custom_id="v:resolve")
     async def resolve_btn(self, interaction: discord.Interaction, button: Button):
-        if not await self._check_mod(interaction):
+        if not await _check_mod(interaction):
             return
         state = _get_state(interaction.channel_id)
         state['state'] = 'verification'
@@ -942,7 +931,7 @@ class ReportResolveView(View):
 
     @discord.ui.button(label=VM["btn_manual_enter"], style=discord.ButtonStyle.secondary, custom_id="v:manual:enter")
     async def manual_btn(self, interaction: discord.Interaction, button: Button):
-        if not await self._check_mod(interaction):
+        if not await _check_mod(interaction):
             return
         state = _get_state(interaction.channel_id)
         state['state'] = 'manual'
@@ -973,8 +962,8 @@ class RejectConfirmView(View):
         main_msg = thread.get_partial_message(state['message_id'])
         try:
             await main_msg.edit(content=content, view=RejectResolveView())
-        except:
-            pass
+        except discord.HTTPException:
+            log.warning("verification: HTTP error swallowed", exc_info=True)
         await thread.send(VM["reject_notify"].format(mention=interaction.user.mention))
         await thread.edit(archived=True, locked=True)
         _clean_state(thread.id)
@@ -988,20 +977,9 @@ class RejectResolveView(View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    async def _check_mod(self, interaction: discord.Interaction) -> bool:
-        member = interaction.user
-        if not isinstance(member, discord.Member):
-            member = interaction.guild.get_member(member.id)
-        mod_role = interaction.guild.get_role(MOD_ROLE_ID)
-        if not mod_role or not member or mod_role not in member.roles:
-            if not member or member.id != interaction.guild.owner_id:
-                await interaction.response.send_message(VM["err_not_verifier"], ephemeral=True)
-                return False
-        return True
-
     @discord.ui.button(label=VM["btn_reinstate"], style=discord.ButtonStyle.primary, custom_id="v:reinstate")
     async def reinstate_btn(self, interaction: discord.Interaction, button: Button):
-        if not await self._check_mod(interaction):
+        if not await _check_mod(interaction):
             return
         state = _get_state(interaction.channel_id)
         state['state'] = 'verification'
@@ -1020,20 +998,9 @@ class ManualModeView(View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    async def _check_mod(self, interaction: discord.Interaction) -> bool:
-        member = interaction.user
-        if not isinstance(member, discord.Member):
-            member = interaction.guild.get_member(member.id)
-        mod_role = interaction.guild.get_role(MOD_ROLE_ID)
-        if not mod_role or not member or mod_role not in member.roles:
-            if not member or member.id != interaction.guild.owner_id:
-                await interaction.response.send_message(VM["err_not_verifier"], ephemeral=True)
-                return False
-        return True
-
     @discord.ui.button(label=VM["btn_manual_exit"], style=discord.ButtonStyle.secondary, custom_id="v:manual:exit")
     async def exit_btn(self, interaction: discord.Interaction, button: Button):
-        if not await self._check_mod(interaction):
+        if not await _check_mod(interaction):
             return
         state = _get_state(interaction.channel_id)
         state['state'] = 'verification'
@@ -1049,7 +1016,7 @@ class ManualModeView(View):
 
     @discord.ui.button(label=VM["btn_manual_verify_no_roles"], style=discord.ButtonStyle.success, custom_id="v:manual:verify")
     async def verify_no_roles_btn(self, interaction: discord.Interaction, button: Button):
-        if not await self._check_mod(interaction):
+        if not await _check_mod(interaction):
             return
         state = _get_state(interaction.channel_id)
         thread = interaction.channel
@@ -1061,7 +1028,7 @@ class ManualModeView(View):
 
     @discord.ui.button(label=VM["btn_manual_verify_roles"], style=discord.ButtonStyle.primary, custom_id="v:manual:verify_roles")
     async def verify_with_roles_btn(self, interaction: discord.Interaction, button: Button):
-        if not await self._check_mod(interaction):
+        if not await _check_mod(interaction):
             return
         state = _get_state(interaction.channel_id)
         thread = interaction.channel
@@ -1103,13 +1070,13 @@ async def video_polling_loop():
                 if not isinstance(thread, discord.Thread):
                     try:
                         thread = await bot.fetch_channel(s['thread_id'])
-                    except:
+                    except discord.HTTPException:
                         continue
                     if not isinstance(thread, discord.Thread):
                         continue
                 try:
                     msg = await thread.fetch_message(s['message_id'])
-                except:
+                except discord.HTTPException:
                     continue
                 s['video_ready'] = True
                 _save_state()
@@ -1126,10 +1093,10 @@ async def video_polling_loop():
                     msg = await thread.fetch_message(s['message_id'])
                     content = _build_challenge_message(s, thread.guild)
                     await msg.edit(content=content, allowed_mentions=_no_ping(), suppress=True)
-                except:
-                    pass
+                except discord.HTTPException:
+                    log.warning("verification: HTTP error swallowed", exc_info=True)
         except Exception:
-            pass  # keep the loop alive on transient errors
+            log.exception("video_polling_loop: transient error swallowed; loop continues")
 
 
 # ── Restore ─────────────────────────────────────────────────────────────────
@@ -1163,8 +1130,8 @@ async def restore_sessions(client: discord.Client):
         if not isinstance(thread, discord.Thread):
             try:
                 thread = await guild.fetch_channel(s['thread_id'])
-            except:
-                pass
+            except discord.HTTPException:
+                log.warning("verification: HTTP error swallowed", exc_info=True)
             if not isinstance(thread, discord.Thread):
                 _state.pop(key, None)
                 _save_state()
@@ -1193,11 +1160,11 @@ async def restore_sessions(client: discord.Client):
             continue
         try:
             bot_msg = await thread.fetch_message(s['message_id'])
-        except:
+        except discord.HTTPException:
             continue
         s['video_ready'] = True
         _save_state()
         try:
             await _enter_verification_phase(thread, s, bot_msg)
         except Exception:
-            pass
+            log.exception("restore_sessions: failed to restore one verification session")
