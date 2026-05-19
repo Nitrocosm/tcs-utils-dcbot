@@ -2,6 +2,7 @@ import asyncio
 import logging
 import discord
 from discord import Guild
+from discord.ext import commands
 from modules import config
 from modules.config import TARGET_GUILD
 from modules.bot_init import bot
@@ -145,26 +146,45 @@ def emojify(text: str, color: str = '') -> str:
 
 import functools
 
+
+def _find_ctx(args: tuple) -> commands.Context:
+    """Locate the commands.Context in a command call's positional args.
+
+    Works whether the decorated callable is a module-level command (called as
+    ``(ctx, ...)``) or a Cog method (called as ``(self, ctx, ...)``).
+    """
+    for a in args:
+        if isinstance(a, commands.Context):
+            return a
+    raise RuntimeError('no Context found in command call args')
+
+
 def has_perms(required_perm: str):
     def decorator(func):
         @functools.wraps(func)
-        async def wrapper(ctx, *args, **kwargs):
+        async def wrapper(*args, **kwargs):
+            ctx = _find_ctx(args)
             if required_perm == 'owner':
                 if ctx.author.id != ctx.guild.owner_id:
                     return await ctx.send(config.message("nuh_uh"))
-
             else:
                 author_perms = ctx.author.guild_permissions
                 if not getattr(author_perms, required_perm, False):
                     return await ctx.send(config.message("nuh_uh"))
 
-            return await func(ctx, *args, **kwargs)
+            return await func(*args, **kwargs)
         return wrapper
     return decorator
 
+
 def can_moderate_member(func):
     @functools.wraps(func)
-    async def wrapper(ctx, member: discord.Member = None, *args, **kwargs):
+    async def wrapper(*args, **kwargs):
+        ctx = _find_ctx(args)
+        # ``member`` is the positional arg right after ctx, or in kwargs.
+        ctx_index = args.index(ctx)
+        member = args[ctx_index + 1] if ctx_index + 1 < len(args) else kwargs.get('member')
+
         if not member:
             await ctx.send(config.message("bot_doesnt_have_perms"))
             return await ctx.send(f'<@{config.OWNER_ID}> fix ur fucking bot\n'
@@ -176,14 +196,16 @@ def can_moderate_member(func):
             return await ctx.send(config.message("nuh_uh"))
         if ctx.author.top_role <= member.top_role and ctx.author.id != ctx.guild.owner_id:
             return await ctx.send(config.message("nuh_uh"))
-        return await func(ctx, member, *args, **kwargs)
+        return await func(*args, **kwargs)
     return wrapper
+
 
 def try_bot_perms(func):
     @functools.wraps(func)
-    async def wrapper(ctx, *args, **kwargs):
+    async def wrapper(*args, **kwargs):
+        ctx = _find_ctx(args)
         try:
-            await func(ctx, *args, **kwargs)
+            await func(*args, **kwargs)
         except discord.Forbidden as e:
             await ctx.send(config.message("bot_doesnt_have_perms"))
             await ctx.send(f'<@{config.OWNER_ID}> fix ur fucking bot\n```{e}```')
