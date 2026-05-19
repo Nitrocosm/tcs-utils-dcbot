@@ -1,10 +1,13 @@
 import asyncio
+import logging
 import re
 import time
 from collections import defaultdict
 
 import discord
 from modules import config
+
+log = logging.getLogger(__name__)
 
 RELATIONS_CHANNEL_ID = config.RELATIONS_CHANNEL_ID
 _role_relations: dict[int, list[int]] = {}
@@ -298,7 +301,24 @@ class RoleSession:
                 final_roles = self._apply_bot_roles(final_roles)
 
             if final_roles != set(fresh_member.roles):
-                await fresh_member.edit(roles=list(final_roles))
+                try:
+                    await fresh_member.edit(roles=list(final_roles))
+                except discord.NotFound:
+                    # Member left/was kicked between our cache read and the
+                    # API call. Common race when on_member_update fires for a
+                    # departing member (Discord sometimes ships MEMBER_UPDATE
+                    # before MEMBER_REMOVE settles). Drop silently.
+                    log.debug("commit: member %s gone (404)", self.member.id)
+                except discord.Forbidden:
+                    # Bot lacks permission to edit this member — usually
+                    # because the member outranks the bot in the role list,
+                    # or because the bot is missing Manage Roles in the
+                    # relevant scope.
+                    log.warning(
+                        "commit: forbidden editing roles on %s (%s) — check role hierarchy",
+                        self.member.id, self.member,
+                        exc_info=True,
+                    )
 
 
     # async def commit_with_relations(self):
